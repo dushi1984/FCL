@@ -13,29 +13,37 @@ export default function Home() {
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(""); // NEW: Tracks errors to show on screen
 
   useEffect(() => {
     fetchMessages();
   }, []);
 
   const fetchMessages = async () => {
+    setError(""); // Clear old errors
     const { data, error } = await supabase.from("messages").select("*").order("created_at", { ascending: false });
-    if (!error && data) setMessages(data);
+    
+    if (error) {
+      setError("FETCH ERROR: " + error.message);
+    } else if (data) {
+      setMessages(data);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !message) return;
     setLoading(true);
+    setError(""); // Clear old errors
     
     const { error } = await supabase.from("messages").insert([{ name, message }]);
     
-    if (!error) {
+    if (error) {
+      setError("POST ERROR: " + error.message);
+    } else {
       setName("");
       setMessage("");
       fetchMessages();
-    } else {
-      alert("Error saving message");
     }
     setLoading(false);
   };
@@ -44,6 +52,13 @@ export default function Home() {
     <main className="min-h-screen p-8 max-w-md mx-auto font-sans">
       <h1 className="text-2xl font-bold mb-6 text-center">Mini Guestbook</h1>
       
+      {/* NEW: This will show the exact error on your iPhone screen */}
+      {error && (
+        <div className="bg-red-100 border-2 border-red-500 text-red-700 px-4 py-3 rounded mb-4 text-sm break-words font-mono">
+          <strong>ERROR:</strong> {error}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4 mb-8">
         <input 
           type="text" 
@@ -77,7 +92,7 @@ export default function Home() {
             <p className="text-gray-800">{msg.message}</p>
           </div>
         ))}
-        {messages.length === 0 && <p className="text-center text-gray-500">No messages yet. Be the first!</p>}
+        {messages.length === 0 && !error && <p className="text-center text-gray-500">No messages yet. Be the first!</p>}
       </div>
     </main>
   );
