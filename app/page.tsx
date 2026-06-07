@@ -1,56 +1,59 @@
 "use client";
-import { createClient } from "@supabase/supabase-js";
 import { useState, useEffect } from "react";
 
-// تكوين Supabase عشان يتجنب مشاكل iOS Safari
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    auth: { persistSession: false, detectSessionInUrl: false, autoRefreshToken: false },
-    global: { headers: { "X-Client-Info": "ios-safe-guestbook" } }
-  }
-);
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const API = `${URL}/rest/v1/messages`;
+const HEADERS = {
+  apikey: KEY,
+  Authorization: `Bearer ${KEY}`,
+  "Content-Type": "application/json",
+  Prefer: "return=representation"
+};
 
 export default function Home() {
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<{id:number, name:string, message:string}[]>([]);
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    fetchMessages();
-  }, []);
-
   const fetchMessages = async () => {
-    setError("");
-    // إضافة timestamp عشان سافاري ميخبيش النتيجة
-    const timestamp = Date.now();
-    const { data, error } = await supabase
-      .from("messages")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(100);
-    
-    if (error) setError("فشل في جلب الرسائل: " + error.message);
-    else if (data) setMessages(data);
+    try {
+      const res = await fetch(`${API}?select=*&order=created_at.desc`, { 
+        headers: HEADERS, 
+        cache: "no-store" // يمنع الكاش على الموبايل نهائياً
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setMessages(data);
+    } catch (err: any) {
+      setError("Load failed: " + err.message);
+    }
   };
+
+  useEffect(() => { fetchMessages(); }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !message.trim()) return;
     setLoading(true);
     setError("");
-    
-    const { error } = await supabase.from("messages").insert([{ name: name.trim(), message: message.trim() }]);
-    
-    if (error) {
-      setError("فشل في الإرسال: " + error.message);
-    } else {
-      setName("");
-      setMessage("");
+
+    try {
+      const res = await fetch(API, {
+        method: "POST",
+        headers: HEADERS,
+        body: JSON.stringify({ name: name.trim(), message: message.trim() })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || `HTTP ${res.status}`);
+      }
+      setName(""); setMessage("");
       fetchMessages();
+    } catch (err: any) {
+      setError("Post failed: " + err.message);
     }
     setLoading(false);
   };
@@ -68,14 +71,14 @@ export default function Home() {
       <form onSubmit={handleSubmit} className="space-y-3 mb-6">
         <input 
           type="text" 
-          placeholder="الاسم" 
+          placeholder="Your Name" 
           value={name} 
           onChange={(e) => setName(e.target.value)} 
           className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           required 
         />
         <textarea 
-          placeholder="الرسالة" 
+          placeholder="Your Message" 
           value={message} 
           onChange={(e) => setMessage(e.target.value)} 
           className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -87,7 +90,7 @@ export default function Home() {
           disabled={loading}
           className="w-full bg-blue-600 text-white p-3 rounded font-medium hover:bg-blue-700 disabled:opacity-50 transition"
         >
-          {loading ? "جاري الإرسال..." : "إرسال"}
+          {loading ? "Sending..." : "Post Message"}
         </button>
       </form>
 
@@ -99,7 +102,7 @@ export default function Home() {
           </div>
         ))}
         {messages.length === 0 && !error && (
-          <p className="text-center text-gray-500 py-4">مفيش رسائل لسه. ابدأ الأول!</p>
+          <p className="text-center text-gray-500 py-4">No messages yet. Be the first!</p>
         )}
       </div>
     </main>
