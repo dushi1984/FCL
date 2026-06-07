@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
 export default function Home() {
-  alert("URL is: " + process.env.NEXT_PUBLIC_SUPABASE_URL);
   const [messages, setMessages] = useState<any[]>([]);
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
@@ -40,6 +39,9 @@ export default function Home() {
   return (
     <main className="min-h-screen p-8 max-w-md mx-auto font-sans">
       <h1 className="text-2xl font-bold mb-6 text-center">Mini Guestbook</h1>
+      <p style={{ color: 'red', fontWeight: 'bold', fontSize: '20px' }}>
+  DEBUG URL IS: {process.env.NEXT_PUBLIC_SUPABASE_URL}
+</p>
       
       <form onSubmit={handleSubmit} className="space-y-4 mb-8">
         <input 
