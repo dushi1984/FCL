@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
 export default function Home() {
+  alert("URL is: " + process.env.NEXT_PUBLIC_SUPABASE_URL);
   const [messages, setMessages] = useState<any[]>([]);
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
