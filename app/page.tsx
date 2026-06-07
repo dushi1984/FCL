@@ -39,9 +39,6 @@ export default function Home() {
   return (
     <main className="min-h-screen p-8 max-w-md mx-auto font-sans">
       <h1 className="text-2xl font-bold mb-6 text-center">Mini Guestbook</h1>
-      <p style={{ color: 'red', fontWeight: 'bold', fontSize: '20px' }}>
-  DEBUG URL IS: {process.env.NEXT_PUBLIC_SUPABASE_URL}
-</p>
       
       <form onSubmit={handleSubmit} className="space-y-4 mb-8">
         <input 
