@@ -1,0 +1,2128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FCL Container Loading Calculator</title>
+<style>
+  :root {
+    --bg-body: #0a0f1a; --bg-sidebar: #0f1626; --bg-panel: #0a0f1a;
+    --bg-input: #1a2332; --bg-hover: #334155;
+    --border-strong: #334155; --border-soft: #1e293b;
+    --text-primary: #f1f5f9; --text-body: #cbd5e1;
+    --text-muted: #94a3b8; --text-dim: #64748b;
+    --accent: #3b82f6; --accent-hover: #2563eb; --accent-soft: #60a5fa;
+    --success: #4ade80; --warning: #fbbf24; --danger: #fca5a5;
+  }
+  body.light {
+    --bg-body: #eef2f7; --bg-sidebar: #ffffff; --bg-panel: #f8fafc;
+    --bg-input: #ffffff; --bg-hover: #e2e8f0;
+    --border-strong: #cbd5e1; --border-soft: #e2e8f0;
+    --text-primary: #0f172a; --text-body: #1e293b;
+    --text-muted: #475569; --text-dim: #94a3b8;
+    --accent: #2563eb; --accent-hover: #1d4ed8; --accent-soft: #3b82f6;
+    --success: #16a34a; --warning: #d97706; --danger: #dc2626;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-body); color: var(--text-body);
+    display: flex; overflow: hidden; font-size: 13px;
+  }
+  #sidebar {
+    width: 400px; background: var(--bg-sidebar); padding: 18px;
+    overflow-y: auto; border-right: 1px solid var(--border-soft);
+    flex-shrink: 0; position: relative; z-index: 10;
+  }
+  #sidebar::-webkit-scrollbar { width: 6px; }
+  #sidebar::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+  h1 { font-size: 15px; color: var(--text-primary); font-weight: 600; }
+  .subtitle { font-size: 11px; color: var(--text-dim); margin: 2px 0 18px; }
+  .section {
+    background: var(--bg-panel); border-radius: 8px; padding: 14px;
+    margin-bottom: 12px; border: 1px solid var(--border-soft);
+  }
+  .section h2 {
+    font-size: 11px; color: var(--text-muted); margin-bottom: 10px;
+    text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600;
+  }
+  label {
+    display: block; font-size: 11px; color: var(--text-muted);
+    margin-bottom: 4px; margin-top: 10px; font-weight: 500;
+  }
+  input, select {
+    width: 100%; padding: 8px 10px; background: var(--bg-input);
+    border: 1px solid var(--border-strong); border-radius: 6px;
+    color: var(--text-body); font-size: 12.5px; font-family: inherit;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .row { display: flex; gap: 8px; }
+  .row > div { flex: 1; }
+  button {
+    width: 100%; padding: 10px; border: none; border-radius: 6px;
+    font-weight: 500; cursor: pointer; font-size: 12.5px;
+    margin-top: 10px; font-family: inherit; transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-secondary {
+    background: var(--bg-panel); color: var(--text-body);
+    border: 1px solid var(--border-strong);
+  }
+  .btn-secondary:hover { background: var(--bg-hover); }
+  .btn-success { background: #14532d; color: #86efac; border: 1px solid #166534; }
+  .btn-success:hover { background: #166534; }
+
+  .mode-switch {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+    background: var(--bg-panel); border-radius: 8px;
+    padding: 5px; border: 1px solid var(--border-soft);
+    margin-bottom: 12px;
+  }
+  .mode-btn {
+    padding: 9px 10px; border-radius: 6px; margin: 0;
+    background: transparent; color: var(--text-muted);
+    font-weight: 600; cursor: pointer; font-size: 12px;
+    border: 1px solid transparent; text-align: center;
+    transition: all 0.15s; font-family: inherit;
+  }
+  .mode-btn:hover { background: var(--bg-hover); color: var(--text-body); }
+  .mode-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100vh; position: relative; }
+  #tabs {
+    display: flex; background: var(--bg-sidebar);
+    border-bottom: 1px solid var(--border-soft);
+    padding: 0 8px; align-items: center;
+    height: 48px; flex-shrink: 0; overflow: visible;
+    position: relative; z-index: 100;
+  }
+  .tab {
+    padding: 0 14px; height: 100%;
+    display: inline-flex; align-items: center;
+    cursor: pointer; font-size: 12.5px; color: var(--text-dim);
+    border-bottom: 2px solid transparent;
+    font-weight: 500; white-space: nowrap; user-select: none; flex-shrink: 0;
+  }
+  .tab:hover { color: var(--text-muted); }
+  .tab.active { color: var(--text-primary); border-bottom-color: var(--accent); }
+  .tab-spacer { flex: 1; min-width: 8px; }
+  .top-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .tab-btn {
+    padding: 0 12px; margin: 0; height: 32px; width: auto;
+    background: var(--bg-panel); color: var(--text-body);
+    border: 1px solid var(--border-strong); font-size: 11.5px;
+    border-radius: 6px; cursor: pointer; font-family: inherit;
+    font-weight: 500; white-space: nowrap; transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+  }
+  .tab-btn:hover { background: var(--bg-hover); }
+  .theme-btn { width: 36px; padding: 0; justify-content: center; height: 32px; }
+  @media (max-width: 1100px) {
+    .tab-btn .lbl { display: none; }
+    .tab { padding: 0 10px; font-size: 12px; }
+  }
+  @media (max-width: 860px) {
+    .tab { padding: 0 8px; }
+    .dropdown-toggle .lbl { display: none; }
+  }
+  .dropdown { position: relative; display: inline-block; flex-shrink: 0; }
+  .dropdown-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 0 12px; height: 32px;
+    background: var(--bg-panel); color: var(--text-body);
+    border: 1px solid var(--border-strong); border-radius: 6px;
+    font-size: 11.5px; font-weight: 500; cursor: pointer;
+    font-family: inherit; transition: all 0.15s; white-space: nowrap;
+  }
+  .dropdown-toggle:hover { background: var(--bg-hover); }
+  .dropdown.open .dropdown-toggle { background: var(--accent); color: white; border-color: var(--accent); }
+  .dropdown-toggle .arrow { font-size: 9px; transition: transform 0.15s; display: inline-block; }
+  .dropdown.open .dropdown-toggle .arrow { transform: rotate(180deg); }
+  .dropdown-menu {
+    display: none; position: absolute; top: calc(100% + 6px); right: 0;
+    background: var(--bg-sidebar); border: 1px solid var(--border-strong);
+    border-radius: 10px; padding: 6px; min-width: 270px;
+    z-index: 99999; box-shadow: 0 16px 40px rgba(0,0,0,0.55);
+    animation: dropIn 0.14s ease; pointer-events: auto;
+  }
+  @keyframes dropIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+  .dropdown.open .dropdown-menu { display: block; }
+  .dropdown-menu .menu-label {
+    font-size: 9.5px; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.8px;
+    padding: 8px 10px 4px; font-weight: 600;
+  }
+  .dropdown-menu button {
+    width: 100%; text-align: left; background: transparent;
+    border: none; color: var(--text-body); padding: 9px 12px;
+    margin: 0; border-radius: 6px; font-size: 12.5px;
+    cursor: pointer; font-family: inherit;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .dropdown-menu button:hover { background: var(--bg-hover); }
+  .dropdown-menu button .icon { width: 18px; text-align: center; font-size: 14px; }
+  .dropdown-menu button .hint { margin-left: auto; font-size: 10px; color: var(--text-dim); }
+  .dropdown-menu .divider { height: 1px; background: var(--border-soft); margin: 5px 2px; }
+  #viewer { flex: 1; position: relative; background: var(--bg-body); min-height: 0; z-index: 1; }
+  #canvas-container { width: 100%; height: 100%; position: absolute; inset: 0; z-index: 0; }
+  #canvas-container canvas { display: block; }
+
+  #report {
+    position: absolute; top: 14px; right: 14px; width: 560px;
+    max-height: calc(100% - 28px); overflow-y: auto;
+    background: var(--bg-sidebar); border: 1px solid var(--border-soft);
+    border-radius: 10px; padding: 18px; font-size: 12px; display: none;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15); z-index: 5;
+  }
+  body:not(.light) #report { background: rgba(15,22,38,0.98); backdrop-filter: blur(10px); }
+  body.light #report { background: rgba(255,255,255,0.98); backdrop-filter: blur(10px); }
+  #report::-webkit-scrollbar { width: 6px; }
+  #report::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+  .rpt-header { border-bottom: 1px solid var(--border-soft); padding-bottom: 12px; margin-bottom: 14px; }
+  .rpt-header h2 { color: var(--text-primary); font-size: 16px; font-weight: 600; margin-bottom: 3px; }
+  .rpt-header .meta { color: var(--text-dim); font-size: 11.5px; margin-bottom: 8px; }
+  .rpt-header .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; margin-top: 10px; }
+  .rpt-header .stats .k { color: var(--text-dim); font-size: 11px; }
+  .rpt-header .stats .v { color: var(--text-body); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .rpt-header .stat-block { display: flex; justify-content: space-between; padding: 3px 0; }
+  .rpt-section-title {
+    color: var(--text-muted); margin: 18px 0 8px;
+    font-size: 10.5px; text-transform: uppercase;
+    letter-spacing: 0.8px; font-weight: 600;
+  }
+  .slice-group { background: var(--bg-panel); border: 1px solid var(--border-soft); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+  .slice-group .slice-head { color: var(--text-primary); font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .slice-group .slice-desc { color: var(--text-body); font-size: 12px; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .slice-group .slice-desc .num { color: var(--accent-soft); font-weight: 600; }
+  .slice-group .slice-detail { color: var(--text-muted); font-size: 11.5px; margin-top: 6px; line-height: 1.55; }
+  .slice-group .slice-orient { color: var(--text-dim); font-size: 11px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border-soft); font-family: 'SF Mono', Monaco, monospace; }
+  .slice-group .slice-items { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .slice-group .slice-preview { margin-top: 12px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-soft); background: #ffffff; display: block; }
+  .slice-group .slice-preview img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; image-rendering: -webkit-optimize-contrast; }
+  .slice-group .slice-preview .caption { padding: 8px 10px; font-size: 11px; color: var(--text-dim); background: var(--bg-panel); border-top: 1px solid var(--border-soft); text-align: center; }
+  .orient-cards { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px; }
+  .orient-card { display: flex; gap: 12px; align-items: center; background: var(--bg-input); border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px; }
+  .orient-card .cube-wrap { flex: 0 0 96px; height: 96px; background: #ffffff; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-soft); }
+  .orient-card .cube-wrap img { width: 100%; height: 100%; object-fit: contain; image-rendering: -webkit-optimize-contrast; }
+  .orient-card .orient-info { flex: 1; min-width: 0; }
+  .orient-card .orient-name { font-size: 12.5px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+  .orient-card .orient-name .dot { width: 10px; height: 10px; border-radius: 2px; }
+  .orient-card .orient-qty { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+  .orient-card .orient-dims { font-size: 11px; color: var(--text-body); font-family: 'SF Mono', Monaco, monospace; line-height: 1.55; }
+  .orient-card .orient-dims .axis { display: inline-block; padding: 1px 5px; border-radius: 3px; font-weight: 600; font-size: 10px; margin-right: 3px; }
+  .orient-card .orient-dims .axis-x { background: #fee2e2; color: #991b1b; }
+  .orient-card .orient-dims .axis-y { background: #dcfce7; color: #166534; }
+  .orient-card .orient-dims .axis-z { background: #dbeafe; color: #1e40af; }
+  .item-chip { display: inline-flex; align-items: center; gap: 5px; background: var(--bg-input); border: 1px solid var(--border-soft); padding: 3px 8px; border-radius: 12px; font-size: 11px; color: var(--text-body); }
+  .item-chip .dot { width: 8px; height: 8px; border-radius: 2px; }
+  .item-chip .qty { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .step { background: var(--bg-panel); padding: 10px 12px; border-radius: 6px; margin: 6px 0; border-left: 2px solid var(--accent); font-size: 11.5px; line-height: 1.55; color: var(--text-body); }
+  .step strong { color: var(--text-primary); }
+  .legend { position: absolute; bottom: 14px; left: 14px; background: var(--bg-sidebar); padding: 10px 14px; border-radius: 8px; font-size: 11px; border: 1px solid var(--border-soft); max-width: 300px; z-index: 4; }
+  body:not(.light) .legend { background: rgba(15,22,38,0.92); backdrop-filter: blur(10px); }
+  body.light .legend { background: rgba(255,255,255,0.94); backdrop-filter: blur(10px); }
+  .legend-title { color: var(--text-dim); font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; font-weight: 600; }
+  .legend-item { display: flex; align-items: center; gap: 8px; margin: 4px 0; color: var(--text-body); }
+  .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(120,120,120,0.25); }
+  #controls {
+    position: absolute; bottom: 14px; right: 14px;
+    background: var(--bg-sidebar); padding: 8px; border-radius: 8px;
+    border: 1px solid var(--border-soft);
+    display: flex; gap: 6px; flex-wrap: wrap; max-width: 620px; z-index: 4;
+  }
+  body:not(.light) #controls { background: rgba(15,22,38,0.92); backdrop-filter: blur(10px); }
+  body.light #controls { background: rgba(255,255,255,0.94); backdrop-filter: blur(10px); }
+  #controls button {
+    margin: 0; padding: 7px 12px; font-size: 11px; width: auto;
+    background: var(--bg-panel); color: var(--text-body);
+    border: 1px solid var(--border-strong); border-radius: 6px;
+    cursor: pointer; font-family: inherit;
+  }
+  #controls button:hover { background: var(--bg-hover); }
+  #controls button.active { background: var(--accent); color: white; border-color: var(--accent); }
+  #controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #manualPanel {
+    display: none; position: absolute; top: 14px; left: 14px;
+    width: 330px; z-index: 6;
+    background: var(--bg-sidebar); border: 1px solid var(--border-soft);
+    border-radius: 10px; padding: 14px;
+    max-height: calc(100% - 28px); overflow-y: auto;
+  }
+  body:not(.light) #manualPanel { background: rgba(15,22,38,0.98); backdrop-filter: blur(10px); box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
+  body.light #manualPanel { background: rgba(255,255,255,0.98); backdrop-filter: blur(10px); }
+  #manualPanel h3 { font-size: 12.5px; color: var(--text-primary); font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  #manualPanel h3 .badge { font-size: 9.5px; padding: 2px 6px; border-radius: 4px; background: var(--accent); color: white; font-weight: 600; }
+  .mp-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .mp-row label { margin: 0; flex: 0 0 70px; font-size: 11px; }
+  .mp-row input { flex: 1; padding: 6px 8px; font-size: 12px; }
+  .mp-row .unit { font-size: 10px; color: var(--text-dim); flex: 0 0 22px; }
+  .mp-group { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-soft); }
+  .mp-group:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .mp-group-title { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; margin-bottom: 8px; }
+  .mp-status { padding: 8px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 500; margin-bottom: 8px; line-height: 1.4; }
+  .mp-status.ok { background: #052e16; color: #86efac; border: 1px solid #166534; }
+  body.light .mp-status.ok { background: #dcfce7; color: #166534; border-color: #86efac; }
+  .preset-btn { padding: 6px 8px; font-size: 10.5px; border-radius: 5px; background: var(--bg-input); color: var(--text-body); border: 1px solid var(--border-strong); cursor: pointer; text-align: left; margin: 3px 3px 0 0; font-family: inherit; }
+  .preset-btn:hover { background: var(--bg-hover); }
+  .mp-list { max-height: 220px; overflow-y: auto; background: var(--bg-panel); border-radius: 6px; padding: 6px; border: 1px solid var(--border-soft); }
+  .mp-item { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+  .mp-item:hover { background: var(--bg-hover); }
+  .mp-item.selected { background: var(--accent); color: white; }
+  .mp-item .mp-item-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .mp-item .mp-item-name { flex: 1; color: var(--text-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mp-item.selected .mp-item-name { color: white; }
+  .mp-item .mp-item-meta { font-size: 9.5px; color: var(--text-dim); font-family: 'SF Mono', Monaco, monospace; }
+  .mp-empty { text-align: center; color: var(--text-dim); font-size: 11px; padding: 14px 8px; }
+  .mp-hint { font-size: 10.5px; color: var(--text-dim); background: var(--bg-panel); padding: 8px 10px; border-radius: 6px; border: 1px dashed var(--border-soft); line-height: 1.5; margin-top: 8px; }
+  .mp-hint kbd { display: inline-block; padding: 1px 5px; background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 3px; font-family: 'SF Mono', Monaco, monospace; font-size: 10px; color: var(--text-body); margin: 0 1px; }
+  #canvas-container.place-cursor canvas { cursor: crosshair; }
+  #canvas-container.drag-cursor canvas { cursor: grabbing; }
+  .cargo-item { background: var(--bg-panel); padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border-soft); position: relative; }
+  .cargo-item .sku-tag { position: absolute; top: 12px; right: 42px; font-size: 10px; color: var(--text-dim); font-weight: 600; }
+  .cargo-item .remove { position: absolute; top: 10px; right: 10px; background: transparent; border: none; color: var(--text-dim); width: 22px; height: 22px; border-radius: 4px; font-size: 16px; cursor: pointer; padding: 0; line-height: 20px; text-align: center; }
+  .cargo-item .remove:hover { background: #7f1d1d; color: #fca5a5; }
+  .cargo-item label { margin-top: 8px; }
+  .cargo-item label:first-of-type { margin-top: 0; }
+  .load-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
+  .load-summary .card { background: var(--bg-panel); border: 1px solid var(--border-soft); padding: 10px; border-radius: 8px; text-align: center; }
+  .load-summary .card .val { font-size: 20px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .load-summary .card .lbl { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.6px; margin-top: 4px; }
+  .progress-bar { height: 6px; background: var(--border-soft); border-radius: 3px; overflow: hidden; margin: 6px 0 4px; }
+  .progress-bar .fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-soft)); transition: width 0.4s; }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--bg-sidebar); border: 1px solid var(--border-strong);
+    color: var(--text-primary); padding: 12px 20px;
+    border-radius: 8px; font-size: 13px; font-weight: 500;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    opacity: 0; pointer-events: none; transition: all 0.25s; z-index: 99999;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.ok { border-left: 3px solid var(--success); }
+  .toast.warn { border-left: 3px solid var(--warning); }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h1>FCL Container Loader</h1>
+  <p class="subtitle">Pure-SKU slices · real pallet dimensions</p>
+
+  <div class="mode-switch">
+    <button class="mode-btn active" id="modeAutoBtn" onclick="setMode('auto')">🔄 Auto Plan</button>
+    <button class="mode-btn" id="modeManualBtn" onclick="setMode('manual')">✋ Manual Pack</button>
+  </div>
+
+  <div class="section">
+    <h2>Container</h2>
+    <select id="containerType" onchange="onContainerChange()">
+      <option value="20">20ft Standard — 5898×2352×2393 mm</option>
+      <option value="40" selected>40ft Standard — 12032×2352×2393 mm</option>
+      <option value="40hc">40ft High Cube — 12032×2352×2698 mm</option>
+      <option value="45hc">45ft High Cube — 13556×2352×2698 mm</option>
+    </select>
+    <label>Client / Reference</label>
+    <input type="text" id="clientName" value="Client">
+    <label>Max Payload (kg)</label>
+    <input type="number" id="maxWeight" value="27000">
+  </div>
+
+  <div class="section">
+    <h2>Cargo Items (SKUs)</h2>
+    <label>Quick presets:</label>
+    <div id="presetButtons"></div>
+    <div id="cargoList" style="margin-top:10px;"></div>
+    <button class="btn-secondary" onclick="addCargo()">+ Add Custom Item</button>
+  </div>
+
+  <div class="section" id="autoRulesSection">
+    <h2>Auto Loading Rules</h2>
+    <label>Slice depth (cm)</label>
+    <input type="number" id="sliceDepth" value="60" step="5">
+    <label><input type="checkbox" id="allowRotation" checked style="width:auto; margin-right:8px;"> Allow 90° rotation</label>
+    <label><input type="checkbox" id="captureSnapshots" checked style="width:auto; margin-right:8px;"> Include slice images in report</label>
+    <label><input type="checkbox" id="captureOrientation" checked style="width:auto; margin-right:8px;"> Include orientation cubes</label>
+  </div>
+
+  <button class="btn-primary" id="mainActionBtn" onclick="calculate()">▶ Generate Loading Plan</button>
+  <button class="btn-secondary" onclick="loadSample()">Load Sample (Container A)</button>
+
+  <div class="section" id="manualHelpSection" style="display:none;">
+    <h2>Manual Mode Guide</h2>
+    <div class="mp-hint">
+      <strong>Click the container floor</strong> to place.<br>
+      <strong>Move:</strong> drag<br>
+      <strong>Rotate:</strong> <kbd>R</kbd><br>
+      <strong>Stack:</strong> <kbd>↑</kbd> / <kbd>↓</kbd><br>
+      <strong>Delete:</strong> <kbd>Del</kbd>
+    </div>
+    <button class="btn-secondary" onclick="clearManualPlacements()">🗑 Clear All</button>
+    <button class="btn-secondary" onclick="undoManual()">↶ Undo</button>
+    <button class="btn-success" onclick="exportManualToReport()">📄 Build Report</button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="tabs">
+    <div class="tab active" data-view="3d">3D</div>
+    <div class="tab" data-view="top">Top</div>
+    <div class="tab" data-view="side">Side</div>
+    <div class="tab" data-view="front">Front</div>
+    <div class="tab-spacer"></div>
+
+    <div class="top-actions">
+      <div class="dropdown" id="exportDropdown">
+        <button class="dropdown-toggle" onclick="toggleExportMenu(event)">
+          📤 <span class="lbl">Export</span> <span class="arrow">▾</span>
+        </button>
+        <div class="dropdown-menu" onclick="event.stopPropagation()">
+          <div class="menu-label">Print</div>
+          <button onclick="printReport()"><span class="icon">🖨️</span><span>Print Report</span><span class="hint">Ctrl+P</span></button>
+          <div class="divider"></div>
+          <div class="menu-label">Documents</div>
+          <button onclick="exportHTML()"><span class="icon">📄</span><span>Export HTML Report</span><span class="hint">.html</span></button>
+          <button onclick="copyReportText()"><span class="icon">📋</span><span>Copy as Plain Text</span></button>
+          <div class="divider"></div>
+          <div class="menu-label">Spreadsheet</div>
+          <button onclick="exportCSV()"><span class="icon">📊</span><span>CSV — Slices / Manual</span><span class="hint">.csv</span></button>
+          <button onclick="exportSKUsCSV()"><span class="icon">📊</span><span>CSV — SKU Summary</span><span class="hint">.csv</span></button>
+          <div class="divider"></div>
+          <div class="menu-label">Images</div>
+          <button onclick="exportSnapshotsZIP()"><span class="icon">🖼️</span><span>Download Slice Snapshots</span><span class="hint">.html</span></button>
+        </div>
+      </div>
+      <button class="tab-btn" onclick="toggleReport()">📄 <span class="lbl">Report</span></button>
+      <button class="tab-btn theme-btn" id="themeBtn" onclick="toggleTheme()">🌙</button>
+    </div>
+  </div>
+  <div id="viewer">
+    <div id="canvas-container"></div>
+
+    <div id="manualPanel">
+      <h3>✋ Manual Packing <span class="badge" id="mpModeBadge">PLACING</span></h3>
+      <div class="mp-group">
+        <div class="mp-group-title">Place Next As</div>
+        <select id="mpSkuSelect" onchange="updateManualSelection()"></select>
+        <div id="mpStatus" class="mp-status ok" style="margin-top:8px;">Ready. Click the container floor.</div>
+      </div>
+      <div class="mp-group">
+        <div class="mp-group-title">Orientation (L × W × H cm)</div>
+        <div class="mp-row"><label>Length</label><input type="number" id="mpL" value="120" step="5" onchange="updateManualDims()"><span class="unit">cm</span></div>
+        <div class="mp-row"><label>Width</label><input type="number" id="mpW" value="100" step="5" onchange="updateManualDims()"><span class="unit">cm</span></div>
+        <div class="mp-row"><label>Height</label><input type="number" id="mpH" value="120" step="5" onchange="updateManualDims()"><span class="unit">cm</span></div>
+        <button class="btn-secondary" style="margin-top:4px;" onclick="rotateManualOrientation()">🔄 Rotate 90°</button>
+      </div>
+      <div class="mp-group">
+        <div class="mp-group-title">Placements (<span id="mpCount">0</span>)</div>
+        <div class="mp-list" id="mpList"><div class="mp-empty">No pallets placed yet</div></div>
+      </div>
+    </div>
+
+    <div class="legend" id="legend">
+      <div class="legend-title">Box Types</div>
+      <div id="legend-items"></div>
+    </div>
+    <div id="controls">
+      <button onclick="resetView()">Reset View</button>
+      <button id="btnWalls" class="active" onclick="toggleContainer()">Container</button>
+      <button id="btnSliceView" onclick="toggleSliceView()">Slice-by-Slice</button>
+      <button id="btnPrevSlice" onclick="stepSlice(-1)">◀ Prev</button>
+      <button id="btnNextSlice" onclick="stepSlice(1)">Next ▶</button>
+    </div>
+    <div id="report"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+/* ============================================================
+   CONTAINER SPECS
+   ============================================================ */
+const CONTAINERS = {
+  '20':   { l: 5898,  w: 2352, h: 2393, name: '20ft Standard' },
+  '40':   { l: 12032, w: 2352, h: 2393, name: '40ft Standard' },
+  '40hc': { l: 12032, w: 2352, h: 2698, name: '40ft High Cube' },
+  '45hc': { l: 13556, w: 2352, h: 2698, name: '45ft High Cube' }
+};
+const SKU_PALETTE = [
+  0x5b8def, 0xd4a857, 0x6fb98f, 0xc76e6e,
+  0x9b8ec4, 0xd68d5c, 0x5fb3c7, 0xa8a8a8
+];
+const SKU_PALETTE_PRINT = [
+  0x3b82f6, 0xf59e0b, 0x22c55e, 0xef4444,
+  0x8b5cf6, 0xf97316, 0x06b6d4, 0x64748b
+];
+
+const PALLET_PRESETS = [
+  { name: 'EUR / EPAL Pallet', l: 1200, w: 800, h: 144, weight: 25, deckH: 144, gap: 100, loadH: 1000 },
+  { name: 'EUR2 / Industrial', l: 1200, w: 1000, h: 144, weight: 33, deckH: 144, gap: 100, loadH: 1000 },
+  { name: 'GMA / US Pallet',   l: 1219, w: 1016, h: 127, weight: 30, deckH: 127, gap: 90, loadH: 1000 },
+  { name: 'Half Pallet (EUR6)',l: 800,  w: 600,  h: 144, weight: 14, deckH: 144, gap: 80, loadH: 1000 },
+  { name: 'UK Pallet',         l: 1200, w: 1000, h: 150, weight: 30, deckH: 150, gap: 100, loadH: 1000 },
+  { name: 'Custom Carton',     l: 600,  w: 400,  h: 400, weight: 20, deckH: 0, gap: 0, loadH: 0 }
+];
+
+let cargoItems = [];
+let cargoIdCounter = 0;
+let sliceSnapshots = {};
+let orientationSnapshots = {};
+let appMode = 'auto';
+
+let manualPlacements = [];
+let selectedPlacementId = null;
+let manualNextSkuId = null;
+let manualNextDims = { l: 1200, w: 1000, h: 1200 };
+let manualHistory = [];
+
+/* THREE.JS */
+let scene, camera, renderer, controls;
+let containerGroup, cargoGroup, highlightGroup, gridHelper;
+let ambientLight, hemiLight, keyLight, fillLight, rimLight;
+let wallsVisible = true;
+let currentView = '3d';
+let currentContainerSpec = null;
+let sliceHighlightIndex = -1;
+let sliceViewMode = false;
+let snapshotRenderer;
+let raycaster, mouseNDC;
+let pointerDownPos = { x: 0, y: 0 };
+let dragState = null;
+
+function getThemeColors() {
+  const light = document.body.classList.contains('light');
+  return light ? {
+    bg: 0xeef2f7, floor: 0xcbd5e1, wall: 0x94a3b8, wallOp: 0.30,
+    grid1: 0xcbd5e1, grid2: 0xe2e8f0, post: 0x64748b,
+    ambient: 0.80, hemiSky: 0.60, key: 0.80, fill: 0.55
+  } : {
+    bg: 0x0a0f1a, floor: 0x1a2332, wall: 0x1e293b, wallOp: 0.35,
+    grid1: 0x1e293b, grid2: 0x111827, post: 0x475569,
+    ambient: 0.55, hemiSky: 0.5, key: 0.95, fill: 0.4
+  };
+}
+
+function initThree() {
+  const container = document.getElementById('canvas-container');
+  const w = container.clientWidth, h = container.clientHeight;
+  const T = getThemeColors();
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(T.bg);
+  camera = new THREE.PerspectiveCamera(45, w / h, 1, 200000);
+  camera.position.set(15000, 9000, 16000);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.NoToneMapping;
+  container.appendChild(renderer.domElement);
+
+  snapshotRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: false });
+  snapshotRenderer.setPixelRatio(1);
+  snapshotRenderer.setSize(2400, 1500);
+  snapshotRenderer.outputEncoding = THREE.sRGBEncoding;
+  snapshotRenderer.toneMapping = THREE.NoToneMapping;
+  snapshotRenderer.shadowMap.enabled = false;
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.09;
+  controls.maxPolarAngle = Math.PI * 0.495;
+
+  ambientLight = new THREE.AmbientLight(0xffffff, T.ambient); scene.add(ambientLight);
+  hemiLight = new THREE.HemisphereLight(0xffffff, T.bg, T.hemiSky); scene.add(hemiLight);
+  keyLight = new THREE.DirectionalLight(0xffffff, T.key);
+  keyLight.position.set(12000, 18000, 8000);
+  keyLight.castShadow = true;
+  keyLight.shadow.mapSize.set(2048, 2048);
+  keyLight.shadow.camera.near = 100; keyLight.shadow.camera.far = 60000;
+  keyLight.shadow.camera.left = -20000; keyLight.shadow.camera.right = 20000;
+  keyLight.shadow.camera.top = 20000; keyLight.shadow.camera.bottom = -20000;
+  keyLight.shadow.bias = -0.0005;
+  scene.add(keyLight);
+  fillLight = new THREE.DirectionalLight(0xdbeafe, T.fill); fillLight.position.set(-10000, 6000, -8000); scene.add(fillLight);
+  rimLight = new THREE.DirectionalLight(0xffffff, 0.35); rimLight.position.set(0, 4000, -12000); scene.add(rimLight);
+
+  gridHelper = new THREE.GridHelper(40000, 40, T.grid1, T.grid2);
+  gridHelper.position.y = -1; scene.add(gridHelper);
+
+  containerGroup = new THREE.Group();
+  cargoGroup = new THREE.Group();
+  highlightGroup = new THREE.Group();
+  scene.add(containerGroup, cargoGroup, highlightGroup);
+
+  raycaster = new THREE.Raycaster();
+  mouseNDC = new THREE.Vector2();
+
+  const dom = renderer.domElement;
+  dom.addEventListener('pointerdown', onPointerDown);
+  dom.addEventListener('pointermove', onPointerMove);
+  dom.addEventListener('pointerup', onPointerUp);
+  dom.addEventListener('pointercancel', onPointerUp);
+  dom.addEventListener('contextmenu', e => e.preventDefault());
+
+  window.addEventListener('resize', onResize);
+  window.addEventListener('keydown', onManualKeyDown);
+  animate();
+}
+function onResize() {
+  const c = document.getElementById('canvas-container');
+  camera.aspect = c.clientWidth / c.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(c.clientWidth, c.clientHeight);
+}
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+function resetView() {
+  const c = currentContainerSpec || CONTAINERS[document.getElementById('containerType').value];
+  const cx = c.l / 2, cy = c.h / 2, cz = c.w / 2;
+  const d = Math.max(c.l, c.w, c.h);
+  camera.position.set(cx + d * 0.55, cy + d * 0.55, cz + d * 0.95);
+  controls.target.set(cx, cy * 0.6, cz);
+  controls.update();
+}
+function toggleContainer() {
+  wallsVisible = !wallsVisible;
+  containerGroup.visible = wallsVisible;
+  document.getElementById('btnWalls').classList.toggle('active', wallsVisible);
+}
+function buildContainer(spec, themeOverride) {
+  currentContainerSpec = spec;
+  const T = themeOverride || getThemeColors();
+  while (containerGroup.children.length) {
+    const c = containerGroup.children.pop();
+    c.geometry?.dispose(); c.material?.dispose();
+  }
+  const floorGeo = new THREE.BoxGeometry(spec.l, 30, spec.w);
+  const floorMat = new THREE.MeshStandardMaterial({ color: T.floor, roughness: 0.9, metalness: 0.2 });
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.position.set(spec.l / 2, -15, spec.w / 2);
+  floor.receiveShadow = true;
+  containerGroup.add(floor);
+  const wallMat = new THREE.MeshStandardMaterial({
+    color: T.wall, roughness: 0.9, metalness: 0.15,
+    transparent: true, opacity: T.wallOp, side: THREE.DoubleSide
+  });
+  const left = new THREE.Mesh(new THREE.BoxGeometry(spec.l, spec.h, 15), wallMat);
+  left.position.set(spec.l / 2, spec.h / 2, 0); containerGroup.add(left);
+  const right = new THREE.Mesh(new THREE.BoxGeometry(spec.l, spec.h, 15), wallMat);
+  right.position.set(spec.l / 2, spec.h / 2, spec.w); containerGroup.add(right);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(15, spec.h, spec.w), wallMat);
+  back.position.set(0, spec.h / 2, spec.w / 2); containerGroup.add(back);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(spec.l, 15, spec.w), wallMat);
+  roof.position.set(spec.l / 2, spec.h, spec.w / 2); containerGroup.add(roof);
+  const postMat = new THREE.MeshStandardMaterial({ color: T.post, roughness: 0.5, metalness: 0.7 });
+  const postGeo = new THREE.BoxGeometry(80, spec.h, 80);
+  [[0,0],[0,spec.w],[spec.l,0],[spec.l,spec.w]].forEach(([x,z]) => {
+    const post = new THREE.Mesh(postGeo, postMat);
+    post.position.set(x, spec.h/2, z); post.castShadow = true;
+    containerGroup.add(post);
+  });
+  const floorEdges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.PlaneGeometry(spec.l, spec.w)),
+    new THREE.LineBasicMaterial({ color: T.grid1 })
+  );
+  floorEdges.rotation.x = -Math.PI / 2;
+  floorEdges.position.set(spec.l / 2, 1, spec.w / 2);
+  containerGroup.add(floorEdges);
+}
+
+/* ============================================================
+   POINTER HANDLING
+   ============================================================ */
+function setNDCFromEvent(e) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+}
+function getFloorPoint(e) {
+  setNDCFromEvent(e);
+  raycaster.setFromCamera(mouseNDC, camera);
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const p = new THREE.Vector3();
+  return raycaster.ray.intersectPlane(plane, p) ? p : null;
+}
+function pickPlacement(e) {
+  setNDCFromEvent(e);
+  raycaster.setFromCamera(mouseNDC, camera);
+  const hits = raycaster.intersectObjects(cargoGroup.children, true);
+  for (const h of hits) {
+    let obj = h.object;
+    while (obj && obj !== scene) {
+      if (obj.userData && obj.userData.placementId !== undefined) return obj.userData.placementId;
+      obj = obj.parent;
+    }
+  }
+  return null;
+}
+function onPointerDown(e) {
+  if (appMode !== 'manual') return;
+  if (e.button !== 0) return;
+  pointerDownPos = { x: e.clientX, y: e.clientY };
+  const hitId = pickPlacement(e);
+  if (hitId !== null) {
+    const pl = manualPlacements.find(p => p.id === hitId);
+    if (pl) {
+      selectedPlacementId = hitId;
+      renderManualPlacements(); updateManualPanel();
+      const fp = getFloorPoint(e);
+      if (fp) {
+        dragState = { placementId: hitId, offsetX: fp.x - pl.x, offsetZ: fp.z - pl.z, moved: false };
+        controls.enabled = false;
+        document.getElementById('canvas-container').classList.add('drag-cursor');
+      }
+    }
+  }
+}
+function onPointerMove(e) {
+  if (appMode !== 'manual') return;
+  if (!dragState) return;
+  const dx = e.clientX - pointerDownPos.x;
+  const dy = e.clientY - pointerDownPos.y;
+  if (dx * dx + dy * dy > 16) dragState.moved = true;
+  const fp = getFloorPoint(e);
+  if (!fp) return;
+  const pl = manualPlacements.find(p => p.id === dragState.placementId);
+  if (!pl) return;
+  let nx = fp.x - dragState.offsetX, nz = fp.z - dragState.offsetZ;
+  if (e.shiftKey) { const g = 50; nx = Math.round(nx/g)*g; nz = Math.round(nz/g)*g; }
+  const spec = currentContainerSpec;
+  nx = Math.max(0, Math.min(spec.l - pl.l, nx));
+  nz = Math.max(0, Math.min(spec.w - pl.w, nz));
+  if (!collidesWithOthers(pl.id, nx, pl.y, nz, pl.l, pl.w, pl.h)) {
+    pl.x = nx; pl.z = nz;
+    renderManualPlacements();
+  }
+}
+function onPointerUp(e) {
+  if (appMode !== 'manual') return;
+  const drag = dragState;
+  const wasDragged = drag && drag.moved;
+  dragState = null;
+  controls.enabled = true;
+  document.getElementById('canvas-container').classList.remove('drag-cursor');
+  if (e.button !== 0) { if (wasDragged) updateManualPanel(); return; }
+  if (wasDragged) { updateManualPanel(); return; }
+  const hitId = pickPlacement(e);
+  if (hitId !== null) { updateManualPanel(); return; }
+  const fp = getFloorPoint(e);
+  if (!fp) return;
+  const spec = currentContainerSpec;
+  if (fp.x < 0 || fp.x > spec.l || fp.z < 0 || fp.z > spec.w) {
+    showToast('Click inside the container floor', 'warn'); return;
+  }
+  placeNewBox(fp.x, fp.z);
+}
+function onManualKeyDown(e) {
+  if (appMode !== 'manual') return;
+  if (selectedPlacementId === null) return;
+  if (document.activeElement && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  const pl = manualPlacements.find(p => p.id === selectedPlacementId);
+  if (!pl) return;
+  const spec = currentContainerSpec;
+  const step = e.shiftKey ? 100 : 50;
+
+  if (e.key === 'r' || e.key === 'R') {
+    const newL = pl.w, newW = pl.l;
+    const cx = pl.x + pl.l/2, cz = pl.z + pl.w/2;
+    const nx = Math.max(0, Math.min(spec.l - newL, cx - newL/2));
+    const nz = Math.max(0, Math.min(spec.w - newW, cz - newW/2));
+    if (!collidesWithOthers(pl.id, nx, pl.y, nz, newL, newW, pl.h)) {
+      pushHistory();
+      pl.l = newL; pl.w = newW; pl.x = nx; pl.z = nz;
+      renderManualPlacements(); updateManualPanel();
+    }
+    e.preventDefault();
+  } else if (e.key === 'ArrowUp') {
+    const ny = pl.y + step;
+    if (ny + pl.h <= spec.h && !collidesWithOthers(pl.id, pl.x, ny, pl.z, pl.l, pl.w, pl.h)) {
+      pushHistory(); pl.y = ny; renderManualPlacements(); updateManualPanel();
+    }
+    e.preventDefault();
+  } else if (e.key === 'ArrowDown') {
+    const ny = Math.max(0, pl.y - step);
+    if (!collidesWithOthers(pl.id, pl.x, ny, pl.z, pl.l, pl.w, pl.h)) {
+      pushHistory(); pl.y = ny; renderManualPlacements(); updateManualPanel();
+    }
+    e.preventDefault();
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    const dxx = e.key === 'ArrowLeft' ? -step : step;
+    const nx = Math.max(0, Math.min(spec.l - pl.l, pl.x + dxx));
+    if (!collidesWithOthers(pl.id, nx, pl.y, pl.z, pl.l, pl.w, pl.h)) {
+      pl.x = nx; renderManualPlacements(); updateManualPanel();
+    }
+    e.preventDefault();
+  } else if (e.key === 'Delete' || e.key === 'Backspace') {
+    pushHistory();
+    manualPlacements = manualPlacements.filter(p => p.id !== selectedPlacementId);
+    selectedPlacementId = null;
+    renderManualPlacements(); updateManualPanel();
+    e.preventDefault();
+  } else if (e.key === 'Escape') {
+    selectedPlacementId = null;
+    renderManualPlacements(); updateManualPanel();
+  }
+}
+function placeNewBox(x, z) {
+  const spec = currentContainerSpec;
+  const skuId = manualNextSkuId;
+  const sku = cargoItems.find(c => c.id === skuId);
+  if (!sku) { showToast('Select an item first', 'warn'); return; }
+  const dims = { ...manualNextDims };
+  let nx = Math.max(0, Math.min(spec.l - dims.l, x - dims.l/2));
+  let nz = Math.max(0, Math.min(spec.w - dims.w, z - dims.w/2));
+  const ny = findLowestY(nx, nz, dims.l, dims.w, dims.h);
+  if (nx + dims.l > spec.l || nz + dims.w > spec.w || ny + dims.h > spec.h) {
+    showToast('Does not fit here', 'warn'); return;
+  }
+  if (collidesWithOthers(null, nx, ny, nz, dims.l, dims.w, dims.h)) {
+    showToast('Overlaps another pallet', 'warn'); return;
+  }
+  const totalWeight = manualPlacements.reduce((s, p) => {
+    const it = cargoItems.find(c => c.id === p.skuId);
+    return s + (it ? it.weight : 0);
+  }, 0);
+  const maxWeight = +document.getElementById('maxWeight').value;
+  if (totalWeight + sku.weight > maxWeight) { showToast('Weight limit', 'warn'); return; }
+  const colorIndex = cargoItems.findIndex(c => c.id === skuId);
+  const pl = {
+    id: 'pl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    skuId, x: nx, y: ny, z: nz,
+    l: dims.l, w: dims.w, h: dims.h,
+    deckH: sku.deckH || 0, gap: sku.gap || 0,
+    colorIndex: colorIndex < 0 ? 0 : colorIndex % SKU_PALETTE.length
+  };
+  pushHistory();
+  manualPlacements.push(pl);
+  selectedPlacementId = pl.id;
+  renderManualPlacements(); updateManualPanel();
+  showToast(`Placed ${sku.name}`, 'ok');
+}
+function findLowestY(x, z, l, w, h) {
+  const overlapping = manualPlacements.filter(p =>
+    x < p.x + p.l && x + l > p.x &&
+    z < p.z + p.w && z + w > p.z);
+  overlapping.sort((a, b) => a.y - b.y);
+  let y = 0, moved = true;
+  while (moved) {
+    moved = false;
+    for (const o of overlapping) {
+      if (y < o.y + o.h && y + h > o.y) { y = o.y + o.h; moved = true; }
+    }
+  }
+  return y;
+}
+function collidesWithOthers(selfId, x, y, z, l, w, h) {
+  for (const p of manualPlacements) {
+    if (p.id === selfId) continue;
+    if (x < p.x + p.l && x + l > p.x &&
+        y < p.y + p.h && y + h > p.y &&
+        z < p.z + p.w && z + w > p.z) return true;
+  }
+  return false;
+}
+function pushHistory() {
+  manualHistory.push(JSON.stringify(manualPlacements));
+  if (manualHistory.length > 50) manualHistory.shift();
+}
+function undoManual() {
+  if (manualHistory.length === 0) return;
+  manualPlacements = JSON.parse(manualHistory.pop());
+  selectedPlacementId = null;
+  renderManualPlacements(); updateManualPanel();
+}
+function clearManualPlacements() {
+  if (manualPlacements.length === 0) return;
+  if (!confirm('Clear all manually placed items?')) return;
+  pushHistory();
+  manualPlacements = []; selectedPlacementId = null;
+  renderManualPlacements(); updateManualPanel();
+}
+
+function renderManualPlacements() {
+  while (cargoGroup.children.length) { const c = cargoGroup.children.pop(); c.geometry?.dispose(); c.material?.dispose(); }
+  while (highlightGroup.children.length) { const c = highlightGroup.children.pop(); c.geometry?.dispose(); c.material?.dispose(); }
+  const light = document.body.classList.contains('light');
+  const edgeColor = light ? 0x1e293b : 0x0f172a;
+
+  manualPlacements.forEach(pl => {
+    const baseColor = SKU_PALETTE[pl.colorIndex % SKU_PALETTE.length];
+    const isSelected = pl.id === selectedPlacementId;
+    const grp = new THREE.Group();
+    grp.userData.placementId = pl.id;
+    cargoGroup.add(grp);
+    const deckH = pl.deckH || 0, gap = pl.gap || 0;
+
+    if (deckH > 0 && gap > 0) {
+      const footH = gap;
+      const deckThickness = Math.max(20, deckH - gap);
+      const footMat = new THREE.MeshStandardMaterial({ color: 0x8b6f47, roughness: 0.95, metalness: 0.02 });
+      const deckMat = new THREE.MeshStandardMaterial({ color: 0xa08158, roughness: 0.9, metalness: 0.02 });
+      const cols = 3, rows = 3;
+      const footL = pl.l / cols * 0.7, footD = pl.w / rows * 0.7;
+      for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+        const fx = pl.x + (i + 0.5) * (pl.l / cols) - footL/2;
+        const fz = pl.z + (j + 0.5) * (pl.w / rows) - footD/2;
+        const fm = new THREE.Mesh(new THREE.BoxGeometry(footL, footH, footD), footMat);
+        fm.position.set(fx + footL/2, pl.y + footH/2, fz + footD/2);
+        fm.castShadow = true; fm.receiveShadow = true; grp.add(fm);
+      }
+      const deckGeo = new THREE.BoxGeometry(pl.l, deckThickness, pl.w);
+      const deckMesh = new THREE.Mesh(deckGeo, deckMat);
+      deckMesh.position.set(pl.x + pl.l/2, pl.y + gap + deckThickness/2, pl.z + pl.w/2);
+      deckMesh.castShadow = true; deckMesh.receiveShadow = true; grp.add(deckMesh);
+      const deckEdge = new THREE.LineSegments(new THREE.EdgesGeometry(deckGeo), new THREE.LineBasicMaterial({ color: 0x4a3620, transparent: true, opacity: 0.7 }));
+      deckEdge.position.copy(deckMesh.position); grp.add(deckEdge);
+
+      const loadH = pl.h - deckH;
+      if (loadH > 0) {
+        const loadGeo = new THREE.BoxGeometry(pl.l - 20, loadH - 6, pl.w - 20);
+        const c = new THREE.Color(baseColor);
+        const top = c.clone().lerp(new THREE.Color(0xffffff), 0.18);
+        const front = c.clone();
+        const side = c.clone().lerp(new THREE.Color(0x000000), 0.12);
+        const mkMat = (color) => {
+          const m = new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0.02 });
+          if (isSelected) { m.emissive = new THREE.Color(baseColor); m.emissiveIntensity = 0.35; }
+          return m;
+        };
+        const mats = [mkMat(side), mkMat(side), mkMat(top), mkMat(side), mkMat(front), mkMat(side)];
+        const loadMesh = new THREE.Mesh(loadGeo, mats);
+        loadMesh.position.set(pl.x + pl.l/2, pl.y + deckH + loadH/2, pl.z + pl.w/2);
+        loadMesh.castShadow = true; loadMesh.receiveShadow = true; grp.add(loadMesh);
+        const loadEdges = new THREE.LineSegments(new THREE.EdgesGeometry(loadGeo), new THREE.LineBasicMaterial({
+          color: isSelected ? 0xfbbf24 : edgeColor, transparent: true, opacity: isSelected ? 1 : 0.75
+        }));
+        loadEdges.position.copy(loadMesh.position); grp.add(loadEdges);
+      }
+    } else {
+      const geo = new THREE.BoxGeometry(pl.l - 6, pl.h - 6, pl.w - 6);
+      const c = new THREE.Color(baseColor);
+      const top = c.clone().lerp(new THREE.Color(0xffffff), 0.18);
+      const front = c.clone();
+      const side = c.clone().lerp(new THREE.Color(0x000000), 0.12);
+      const mkMat = (color) => {
+        const m = new THREE.MeshStandardMaterial({ color, roughness: 0.72, metalness: 0.08 });
+        if (isSelected) { m.emissive = new THREE.Color(baseColor); m.emissiveIntensity = 0.35; }
+        return m;
+      };
+      const mats = [mkMat(side), mkMat(side), mkMat(top), mkMat(side), mkMat(front), mkMat(side)];
+      const mesh = new THREE.Mesh(geo, mats);
+      mesh.position.set(pl.x + pl.l/2, pl.y + pl.h/2, pl.z + pl.w/2);
+      mesh.castShadow = true; mesh.receiveShadow = true; grp.add(mesh);
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({
+        color: isSelected ? 0xfbbf24 : edgeColor, transparent: true, opacity: isSelected ? 1 : 0.85
+      }));
+      edges.position.copy(mesh.position); grp.add(edges);
+    }
+    if (isSelected) {
+      const ring = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(pl.l + 40, 20, pl.w + 40)), new THREE.LineBasicMaterial({ color: 0xfbbf24 }));
+      ring.position.set(pl.x + pl.l/2, pl.y - 10, pl.z + pl.w/2);
+      grp.add(ring);
+    }
+  });
+}
+
+/* ============================================================
+   UI PANEL
+   ============================================================ */
+function updateManualPanel() {
+  const sel = document.getElementById('mpSkuSelect');
+  if (sel.options.length !== cargoItems.length) {
+    sel.innerHTML = '';
+    cargoItems.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = `${c.name} — ${(c.l/10).toFixed(0)}×${(c.w/10).toFixed(0)}×${(c.h/10).toFixed(0)} cm`;
+      sel.appendChild(opt);
+    });
+    if (manualNextSkuId === null && cargoItems.length > 0) manualNextSkuId = cargoItems[0].id;
+    sel.value = manualNextSkuId;
+  }
+  if (!document.activeElement.matches('#mpL,#mpW,#mpH')) {
+    document.getElementById('mpL').value = (manualNextDims.l/10).toFixed(0);
+    document.getElementById('mpW').value = (manualNextDims.w/10).toFixed(0);
+    document.getElementById('mpH').value = (manualNextDims.h/10).toFixed(0);
+  }
+  document.getElementById('mpCount').textContent = manualPlacements.length;
+  const statusEl = document.getElementById('mpStatus');
+  const spec = currentContainerSpec;
+  const totalWeight = manualPlacements.reduce((s, p) => {
+    const it = cargoItems.find(c => c.id === p.skuId);
+    return s + (it ? it.weight : 0);
+  }, 0);
+  const maxWeight = +document.getElementById('maxWeight').value;
+  const totalVol = manualPlacements.reduce((s, p) => s + p.l * p.w * p.h, 0) / 1e9;
+  const containerVol = spec ? (spec.l * spec.w * spec.h) / 1e9 : 1;
+  const utilPct = ((totalVol / containerVol) * 100).toFixed(0);
+  if (manualPlacements.length === 0) {
+    statusEl.className = 'mp-status ok';
+    statusEl.textContent = 'Ready. Click the container floor to place.';
+  } else {
+    statusEl.className = 'mp-status ok';
+    statusEl.innerHTML = `<strong>${manualPlacements.length}</strong> placed · ${totalWeight.toFixed(0)} / ${maxWeight} kg · ${utilPct}% volume`;
+  }
+  const list = document.getElementById('mpList');
+  list.innerHTML = '';
+  if (manualPlacements.length === 0) {
+    list.innerHTML = '<div class="mp-empty">No pallets placed yet</div>';
+  } else {
+    manualPlacements.slice().reverse().forEach(pl => {
+      const sku = cargoItems.find(c => c.id === pl.skuId);
+      const colorHex = '#' + SKU_PALETTE[pl.colorIndex % SKU_PALETTE.length].toString(16).padStart(6, '0');
+      const el = document.createElement('div');
+      el.className = 'mp-item' + (pl.id === selectedPlacementId ? ' selected' : '');
+      el.innerHTML = `<div class="mp-item-dot" style="background:${colorHex}"></div>
+        <div class="mp-item-name">${sku ? sku.name : 'Unknown'}</div>
+        <div class="mp-item-meta">${(pl.l/10).toFixed(0)}×${(pl.w/10).toFixed(0)}×${(pl.h/10).toFixed(0)}</div>`;
+      el.onclick = () => { selectedPlacementId = pl.id; renderManualPlacements(); updateManualPanel(); };
+      list.appendChild(el);
+    });
+  }
+  const badge = document.getElementById('mpModeBadge');
+  badge.textContent = selectedPlacementId ? 'EDITING' : 'PLACING';
+  badge.style.background = selectedPlacementId ? '#f59e0b' : 'var(--accent)';
+}
+function updateManualSelection() {
+  const id = +document.getElementById('mpSkuSelect').value;
+  manualNextSkuId = id;
+  const sku = cargoItems.find(c => c.id === id);
+  if (sku) manualNextDims = { l: sku.l, w: sku.w, h: sku.h };
+  updateManualPanel();
+}
+function updateManualDims() {
+  const l = Math.round(+document.getElementById('mpL').value * 10);
+  const w = Math.round(+document.getElementById('mpW').value * 10);
+  const h = Math.round(+document.getElementById('mpH').value * 10);
+  if (l > 0 && w > 0 && h > 0) manualNextDims = { l, w, h };
+}
+function rotateManualOrientation() {
+  const tmp = manualNextDims.l;
+  manualNextDims.l = manualNextDims.w;
+  manualNextDims.w = tmp;
+  document.getElementById('mpL').value = (manualNextDims.l/10).toFixed(0);
+  document.getElementById('mpW').value = (manualNextDims.w/10).toFixed(0);
+}
+
+function setMode(mode) {
+  appMode = mode;
+  document.getElementById('modeAutoBtn').classList.toggle('active', mode === 'auto');
+  document.getElementById('modeManualBtn').classList.toggle('active', mode === 'manual');
+  document.getElementById('manualPanel').style.display = mode === 'manual' ? 'block' : 'none';
+  document.getElementById('manualHelpSection').style.display = mode === 'manual' ? 'block' : 'none';
+  document.getElementById('autoRulesSection').style.display = mode === 'auto' ? 'block' : 'none';
+  const btn = document.getElementById('mainActionBtn');
+  if (mode === 'auto') {
+    btn.textContent = '▶ Generate Loading Plan';
+    btn.onclick = calculate;
+  } else {
+    btn.textContent = '✋ Manual mode — click floor';
+    btn.onclick = () => showToast('Click on the container floor', 'ok');
+  }
+  const spec = CONTAINERS[document.getElementById('containerType').value];
+  buildContainer(spec);
+  if (mode === 'auto') {
+    manualPlacements = []; selectedPlacementId = null; manualHistory = [];
+    renderCargo(window.__lastPacking || null);
+  } else {
+    renderManualPlacements(); updateManualPanel();
+    document.getElementById('canvas-container').classList.add('place-cursor');
+  }
+  if (mode === 'auto') document.getElementById('canvas-container').classList.remove('place-cursor', 'drag-cursor');
+  resetView();
+}
+function onContainerChange() {
+  const spec = CONTAINERS[document.getElementById('containerType').value];
+  buildContainer(spec);
+  if (appMode === 'manual') renderManualPlacements();
+  else if (window.__lastPacking) renderCargo(window.__lastPacking);
+  resetView();
+}
+
+/* ============================================================
+   CARGO LIST & PRESETS
+   ============================================================ */
+function renderPresetButtons() {
+  const wrap = document.getElementById('presetButtons');
+  wrap.innerHTML = '';
+  PALLET_PRESETS.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'preset-btn';
+    b.textContent = `+ ${p.name}`;
+    b.onclick = () => {
+      cargoIdCounter++;
+      const totalH = p.deckH + p.loadH;
+      cargoItems.push({
+        id: cargoIdCounter, name: p.name,
+        l: p.l, w: p.w, h: totalH,
+        weight: p.weight + 200, qty: 20,
+        deckH: p.deckH, gap: p.gap
+      });
+      renderCargoList();
+      showToast(`Added ${p.name}`, 'ok');
+    };
+    wrap.appendChild(b);
+  });
+}
+function renderCargoList() {
+  const list = document.getElementById('cargoList');
+  list.innerHTML = '';
+  cargoItems.forEach((c, idx) => {
+    const div = document.createElement('div');
+    div.className = 'cargo-item';
+    const colorHex = '#' + SKU_PALETTE[idx % SKU_PALETTE.length].toString(16).padStart(6, '0');
+    div.innerHTML = `
+      <div class="sku-tag" style="color:${colorHex}">SKU ${idx + 1}</div>
+      <button class="remove" onclick="removeCargo(${c.id})">×</button>
+      <label>Name</label>
+      <input type="text" value="${c.name}" onchange="updateCargo(${c.id},'name',this.value)">
+      <div class="row">
+        <div><label>Length (cm)</label><input type="number" value="${(c.l/10).toFixed(1)}" step="0.1" onchange="updateCargo(${c.id},'l',Math.round(+this.value*10))"></div>
+        <div><label>Width (cm)</label><input type="number" value="${(c.w/10).toFixed(1)}" step="0.1" onchange="updateCargo(${c.id},'w',Math.round(+this.value*10))"></div>
+        <div><label>Height (cm)</label><input type="number" value="${(c.h/10).toFixed(1)}" step="0.1" onchange="updateCargo(${c.id},'h',Math.round(+this.value*10))"></div>
+      </div>
+      <div class="row">
+        <div><label>Weight (kg)</label><input type="number" value="${c.weight}" step="0.1" onchange="updateCargo(${c.id},'weight',+this.value)"></div>
+        <div><label>Quantity</label><input type="number" value="${c.qty}" onchange="updateCargo(${c.id},'qty',+this.value)"></div>
+      </div>`;
+    list.appendChild(div);
+  });
+  const sel = document.getElementById('mpSkuSelect');
+  sel.innerHTML = '';
+  cargoItems.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = `${c.name} — ${(c.l/10).toFixed(0)}×${(c.w/10).toFixed(0)}×${(c.h/10).toFixed(0)} cm`;
+    sel.appendChild(opt);
+  });
+  if (manualNextSkuId === null && cargoItems.length > 0) {
+    manualNextSkuId = cargoItems[0].id;
+    manualNextDims = { l: cargoItems[0].l, w: cargoItems[0].w, h: cargoItems[0].h };
+  }
+  sel.value = manualNextSkuId;
+}
+function addCargo() {
+  cargoIdCounter++;
+  cargoItems.push({
+    id: cargoIdCounter, name: 'Item ' + String.fromCharCode(64 + cargoIdCounter),
+    l: 1200, w: 1000, h: 1200, weight: 250, qty: 10
+  });
+  renderCargoList();
+}
+function removeCargo(id) {
+  cargoItems = cargoItems.filter(c => c.id !== id);
+  renderCargoList();
+}
+function updateCargo(id, field, value) {
+  const c = cargoItems.find(x => x.id === id);
+  if (c) c[field] = value;
+}
+function loadSample() {
+  cargoIdCounter = 0;
+  cargoItems = [
+    { id: ++cargoIdCounter, name: 'Box B', l: 600, w: 340, h: 200, weight: 3, qty: 720 },
+    { id: ++cargoIdCounter, name: 'Box D', l: 600, w: 340, h: 300, weight: 5, qty: 152 },
+    { id: ++cargoIdCounter, name: 'Box A', l: 600, w: 340, h: 300, weight: 5, qty: 139 },
+    { id: ++cargoIdCounter, name: 'Box C', l: 600, w: 340, h: 150, weight: 2, qty: 68 }
+  ];
+  document.getElementById('clientName').value = 'colins';
+  document.getElementById('containerType').value = '40';
+  document.getElementById('maxWeight').value = 27000;
+  document.getElementById('sliceDepth').value = 60;
+  renderCargoList();
+}
+function renderLegend(packing) {
+  const items = document.getElementById('legend-items');
+  items.innerHTML = '';
+  if (!packing) return;
+  packing.skus.forEach(sk => {
+    if (sk.qty === 0) return;
+    const colorHex = '#' + SKU_PALETTE[sk.colorIndex].toString(16).padStart(6, '0');
+    const packed = sk.qty - sk.remaining;
+    const div = document.createElement('div');
+    div.className = 'legend-item';
+    div.innerHTML = `<div class="swatch" style="background:${colorHex}"></div><span>${sk.name} · ${packed}/${sk.qty} loaded</span>`;
+    items.appendChild(div);
+  });
+}
+
+/* ============================================================
+   AUTO PACKING — PURE-SKU SLICES
+   ------------------------------------------------------------
+   KEY RULES:
+   1. Each slice is filled by ONE SKU only. If a SKU can't
+      completely fill the last row of a slice, that leftover
+      space stays empty (never mixed with another SKU).
+   2. We iterate SKUs one at a time (heaviest first). Each SKU
+      gets its own consecutive block of slices.
+   3. When a slice is complete, we move to the next slice.
+   4. Only when a SKU runs out do we advance to the next SKU
+      and start a new block of slices.
+   ============================================================ */
+function slicePacking(spec, items, opts) {
+  const { sliceDepth, allowRotation, maxWeight } = opts;
+
+  // Sort SKUs by volume DESC so large boxes get the back-of-container real estate
+  const skus = items.map((it, i) => ({
+    id: it.id, name: it.name,
+    l: it.l, w: it.w, h: it.h,
+    weight: it.weight, qty: it.qty, remaining: it.qty,
+    colorIndex: i % SKU_PALETTE.length,
+    eL: it.l, eW: it.w, eH: it.h
+  }));
+  const sliceDepthMm = sliceDepth * 10;
+
+  // Pick best orientation: length along container X (must fit sliceDepth)
+  skus.forEach(sku => {
+    const cands = [];
+    if (allowRotation) {
+      const perms = [
+        [sku.l, sku.w, sku.h], [sku.l, sku.h, sku.w],
+        [sku.w, sku.l, sku.h], [sku.w, sku.h, sku.l],
+        [sku.h, sku.l, sku.w], [sku.h, sku.w, sku.l]
+      ];
+      perms.forEach(p => cands.push({ x: p[0], y: p[1], z: p[2] }));
+    } else {
+      cands.push({ x: sku.l, y: sku.h, z: sku.w });
+    }
+    let best = null;
+    cands.forEach(c => {
+      if (c.x > sliceDepthMm + 5) return;
+      const xDiff = Math.abs(c.x - sliceDepthMm);
+      const cols = Math.floor(spec.w / c.z);
+      const rowsH = Math.floor(spec.h / c.y);
+      if (cols < 1 || rowsH < 1) return;
+      const score = (cols * rowsH) * 10000 - xDiff;
+      if (!best || score > best.score) best = { ...c, score };
+    });
+    if (best) { sku.eL = best.x; sku.eH = best.y; sku.eW = best.z; }
+  });
+
+  // Order SKUs: heaviest first (goes low, at back), then larger volume
+  const orderedSkus = [...skus].sort((a, b) => {
+    const wDiff = b.weight - a.weight;
+    if (Math.abs(wDiff) > 0.5) return wDiff;
+    return (b.l * b.w * b.h) - (a.l * a.w * a.h);
+  }).filter(s => s.remaining > 0 && s.eW > 0 && s.eH > 0);
+
+  const numSlicesAvailable = Math.floor(spec.l / sliceDepthMm);
+  const slices = [];
+  let totalWeight = 0, totalPacked = 0;
+  let sliceIdx = 0; // global slice counter
+
+  // For each SKU in turn, allocate a contiguous run of slices
+  for (const sku of orderedSkus) {
+    if (sliceIdx >= numSlicesAvailable) break;
+    if (sku.remaining === 0) continue;
+
+    const cols = Math.floor(spec.w / sku.eW);
+    const rowsPerSlice = Math.floor(spec.h / sku.eH);
+    const perSlice = cols * rowsPerSlice;
+    if (perSlice < 1) {
+      // This SKU cannot fit even one slice — try to load without slices (fallback)
+      continue;
+    }
+
+    // Keep filling slices until SKU is exhausted or container is full
+    while (sku.remaining > 0 && sliceIdx < numSlicesAvailable) {
+      // Weight check
+      const maxByWeight = Math.floor((maxWeight - totalWeight) / sku.weight);
+      if (maxByWeight < 1) break;
+
+      const inThisSlice = Math.min(perSlice, sku.remaining, maxByWeight);
+      const fullRowsInSlice = Math.floor(inThisSlice / cols);
+      const remainderInLastRow = inThisSlice % cols;
+
+      const slice = {
+        index: sliceIdx + 1,
+        depth: sliceDepthMm,
+        xStart: sliceIdx * sliceDepthMm,
+        cols: cols,
+        rowsMax: rowsPerSlice,
+        items: [],
+        placementCells: []
+      };
+
+      let placed = 0;
+      // Fill full rows first (col 1..cols each row)
+      for (let row = 0; row < fullRowsInSlice; row++) {
+        for (let col = 0; col < cols; col++) {
+          slice.placementCells.push({
+            x: slice.xStart,
+            y: row * sku.eH,
+            z: col * sku.eW,
+            l: sku.eL, w: sku.eW, h: sku.eH,
+            skuId: sku.id, skuName: sku.name,
+            colorIndex: sku.colorIndex,
+            col: col + 1, row: row + 1
+          });
+          placed++;
+        }
+      }
+      // If a partial row remains, place only that many in the next row
+      if (remainderInLastRow > 0) {
+        const row = fullRowsInSlice;
+        for (let col = 0; col < remainderInLastRow; col++) {
+          slice.placementCells.push({
+            x: slice.xStart,
+            y: row * sku.eH,
+            z: col * sku.eW,
+            l: sku.eL, w: sku.eW, h: sku.eH,
+            skuId: sku.id, skuName: sku.name,
+            colorIndex: sku.colorIndex,
+            col: col + 1, row: row + 1
+          });
+          placed++;
+        }
+      }
+
+      // Add slice items entry (SINGLE SKU — this is the key)
+      slice.items.push({
+        skuId: sku.id,
+        name: sku.name,
+        colorIndex: sku.colorIndex,
+        qty: placed,
+        orientation: `${sku.eL}x${sku.eW}x${sku.eH}`
+      });
+
+      slice.totalCartons = placed;
+      // The effective rows used (for display): max row that has any box
+      let rowsUsed = fullRowsInSlice + (remainderInLastRow > 0 ? 1 : 0);
+      slice.rowsUsed = rowsUsed;
+      slice.rowsMax = rowsUsed; // keep rowsMax as the count actually used
+
+      sku.remaining -= placed;
+      totalWeight += placed * sku.weight;
+      totalPacked += placed;
+
+      slices.push(slice);
+      sliceIdx++;
+    }
+  }
+
+  return { slices, skus, totalWeight, totalPacked };
+}
+
+/* Group slices — smarter: same SKU + same layout + same qty per slice */
+function groupSlices(slices) {
+  const groups = [];
+  let current = null;
+  function signature(sl) {
+    // Only one SKU per slice now, so signature is simple & reliable
+    if (sl.items.length === 0) return 'empty';
+    const it = sl.items[0];
+    return `${it.skuId}|${it.qty}|${sl.cols}|${sl.rowsUsed}|${it.orientation}`;
+  }
+  slices.forEach(sl => {
+    const sig = signature(sl);
+    if (current && current.signature === sig) {
+      current.count++;
+      current.endIndex = sl.index;
+      current.slices.push(sl);
+    } else {
+      if (current) groups.push(current);
+      current = {
+        signature: sig, count: 1,
+        startIndex: sl.index, endIndex: sl.index,
+        sample: sl, slices: [sl]
+      };
+    }
+  });
+  if (current) groups.push(current);
+  return groups;
+}
+
+function renderCargo(packing, opts) {
+  window.__lastPacking = packing;
+  const opts2 = opts || {};
+  const printMode = !!opts2.printMode;
+  const light = document.body.classList.contains('light') || printMode;
+  const edgeColor = printMode ? 0x334155 : (light ? 0x94a3b8 : 0x0a0f1a);
+  const edgeOpacity = printMode ? 0.85 : (light ? 0.6 : 0.55);
+  const palette = SKU_PALETTE;
+
+  while (cargoGroup.children.length) { const c = cargoGroup.children.pop(); c.geometry?.dispose(); c.material?.dispose(); }
+  while (highlightGroup.children.length) { const c = highlightGroup.children.pop(); c.geometry?.dispose(); c.material?.dispose(); }
+  if (!packing) return;
+  const shrink = 4;
+  packing.slices.forEach(sl => {
+    const isHighlighted = !sliceViewMode || sl.index === sliceHighlightIndex;
+    sl.placementCells.forEach(p => {
+      const baseColor = palette[p.colorIndex % palette.length];
+      const geo = new THREE.BoxGeometry(p.l - shrink, p.h - shrink, p.w - shrink);
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+        color: baseColor, roughness: 0.72, metalness: 0.08,
+        transparent: sliceViewMode && !isHighlighted,
+        opacity: sliceViewMode && !isHighlighted ? 0.10 : 1
+      }));
+      mesh.position.set(p.x + p.l/2, p.y + p.h/2, p.z + p.w/2);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      (isHighlighted ? cargoGroup : highlightGroup).add(mesh);
+      if (isHighlighted) {
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+          new THREE.LineBasicMaterial({ color: edgeColor, transparent: true, opacity: edgeOpacity }));
+        edges.position.copy(mesh.position);
+        cargoGroup.add(edges);
+      }
+    });
+  });
+}
+
+/* ============================================================
+   SNAPSHOTS
+   ============================================================ */
+async function captureAllSnapshots(packing) {
+  const captureSlices = document.getElementById('captureSnapshots').checked;
+  const captureOrientation = document.getElementById('captureOrientation').checked;
+  sliceSnapshots = {}; orientationSnapshots = {};
+  if (!captureSlices && !captureOrientation) return;
+  const spec = currentContainerSpec;
+  const groups = groupSlices(packing.slices);
+  if (groups.length === 0) return;
+  const IMG_W = 2400, IMG_H = 1500;
+  snapshotRenderer.setSize(IMG_W, IMG_H, false);
+  if (captureSlices) {
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i]; const key = groupKey(g);
+      sliceSnapshots[key] = await renderSliceScene(packing, spec, g, IMG_W, IMG_H);
+      if (captureOrientation) {
+        for (const it of g.sample.items) {
+          const sku = packing.skus.find(k => k.id === it.skuId);
+          if (!sku) continue;
+          const [oL, oW, oH] = it.orientation.split('x').map(Number);
+          orientationSnapshots[`${key}::${it.skuId}`] = await renderOrientationCube(sku, oL, oW, oH, it.colorIndex);
+        }
+      }
+    }
+  } else if (captureOrientation) {
+    for (const g of groups) {
+      const key = groupKey(g);
+      for (const it of g.sample.items) {
+        const sku = packing.skus.find(k => k.id === it.skuId);
+        if (!sku) continue;
+        const [oL, oW, oH] = it.orientation.split('x').map(Number);
+        orientationSnapshots[`${key}::${it.skuId}`] = await renderOrientationCube(sku, oL, oW, oH, it.colorIndex);
+      }
+    }
+  }
+}
+
+async function renderSliceScene(packing, spec, group, W, H) {
+  const sl = group.sample;
+  const localScene = new THREE.Scene();
+  localScene.background = new THREE.Color(0xffffff);
+  localScene.add(new THREE.AmbientLight(0xffffff, 0.95));
+  localScene.add(new THREE.HemisphereLight(0xffffff, 0xf1f5f9, 0.90));
+  const k = new THREE.DirectionalLight(0xffffff, 0.70); k.position.set(1, 1.5, 0.8); localScene.add(k);
+  const f = new THREE.DirectionalLight(0xffffff, 0.55); f.position.set(-1.2, 0.8, 1.2); localScene.add(f);
+  const r = new THREE.DirectionalLight(0xffffff, 0.35); r.position.set(-0.3, 0.6, -1.5); localScene.add(r);
+
+  const pad = 60;
+  const minX = -pad, maxX = spec.l + pad;
+  const minY = -pad, maxY = spec.h + pad;
+  const minZ = -pad, maxZ = spec.w + pad;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const cz = (minZ + maxZ) / 2;
+
+  addContainerFrame(localScene, spec, 0x94a3b8, 0x475569);
+
+  const palette = SKU_PALETTE_PRINT;
+  sl.placementCells.forEach(p => {
+    const baseColor = palette[p.colorIndex % palette.length];
+    const geo = new THREE.BoxGeometry(p.l - 6, p.h - 6, p.w - 6);
+    const c = new THREE.Color(baseColor);
+    const top = c.clone().lerp(new THREE.Color(0xffffff), 0.18);
+    const front = c.clone();
+    const side = c.clone().lerp(new THREE.Color(0x000000), 0.12);
+    const mats = [
+      new THREE.MeshStandardMaterial({ color: side }),
+      new THREE.MeshStandardMaterial({ color: side }),
+      new THREE.MeshStandardMaterial({ color: top }),
+      new THREE.MeshStandardMaterial({ color: side }),
+      new THREE.MeshStandardMaterial({ color: front }),
+      new THREE.MeshStandardMaterial({ color: side })
+    ];
+    const mesh = new THREE.Mesh(geo, mats);
+    mesh.position.set(p.x + p.l/2, p.y + p.h/2, p.z + p.w/2);
+    localScene.add(mesh);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.85 }));
+    edges.position.copy(mesh.position);
+    localScene.add(edges);
+  });
+
+  const planeGeo = new THREE.PlaneGeometry(spec.l + 600, spec.w + 600);
+  const planeMat = new THREE.MeshBasicMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.45 });
+  const plane = new THREE.Mesh(planeGeo, planeMat);
+  plane.rotation.x = -Math.PI / 2;
+  plane.position.set(cx, -0.5, cz);
+  localScene.add(plane);
+
+  const aspect = W / H;
+  const dir = new THREE.Vector3(1.0, 0.55, 1.0).normalize();
+  const lookAt = new THREE.Vector3(cx, cy * 0.5, cz);
+  const corners = [];
+  [minX, maxX].forEach(x => [minY, maxY].forEach(y => [minZ, maxZ].forEach(z => corners.push(new THREE.Vector3(x, y, z)))));
+  const forward = dir.clone().negate();
+  const worldUp = new THREE.Vector3(0, 1, 0);
+  const right = new THREE.Vector3().crossVectors(worldUp, forward).normalize();
+  const up = new THREE.Vector3().crossVectors(forward, right).normalize();
+  let uMin = Infinity, uMax = -Infinity, vMin = Infinity, vMax = -Infinity;
+  corners.forEach(p => {
+    const rel = p.clone().sub(lookAt);
+    const u = rel.dot(right), v = rel.dot(up);
+    uMin = Math.min(uMin, u); uMax = Math.max(uMax, u);
+    vMin = Math.min(vMin, v); vMax = Math.max(vMax, v);
+  });
+  const bboxW = uMax - uMin, bboxH = vMax - vMin;
+  const margin = 1.04;
+  const halfWn = (bboxW * margin) / 2;
+  const halfHn = (bboxH * margin) / 2;
+  let halfW = Math.max(halfWn, halfHn * aspect);
+  let halfH = halfW / aspect;
+  if (halfH < halfHn) { halfH = halfHn; halfW = halfH * aspect; }
+  const uCenter = (uMin + uMax) / 2, vCenter = (vMin + vMax) / 2;
+  const newLookAt = lookAt.clone().addScaledVector(right, uCenter).addScaledVector(up, vCenter);
+  const cam = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 1, 200000);
+  const dist = Math.max(spec.l, spec.w, spec.h) * 3;
+  cam.position.copy(newLookAt).addScaledVector(dir, dist);
+  cam.up.copy(up);
+  cam.lookAt(newLookAt);
+  cam.updateProjectionMatrix();
+
+  snapshotRenderer.setSize(W, H, false);
+  snapshotRenderer.render(localScene, cam);
+  const dataURL = snapshotRenderer.domElement.toDataURL('image/png');
+
+  localScene.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) {
+      if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+      else o.material.dispose();
+    }
+  });
+  return dataURL;
+}
+
+function addContainerFrame(sceneRef, spec, edgeColor, postColor) {
+  const edgeMat = new THREE.LineBasicMaterial({ color: edgeColor, transparent: true, opacity: 0.65 });
+  const boxGeo = new THREE.BoxGeometry(spec.l, spec.h, spec.w);
+  const wf = new THREE.LineSegments(new THREE.EdgesGeometry(boxGeo), edgeMat);
+  wf.position.set(spec.l/2, spec.h/2, spec.w/2);
+  sceneRef.add(wf);
+  const postMat = new THREE.MeshBasicMaterial({ color: postColor, transparent: true, opacity: 0.75 });
+  const postGeo = new THREE.BoxGeometry(60, spec.h, 60);
+  [[0,0],[0,spec.w],[spec.l,0],[spec.l,spec.w]].forEach(([x,z]) => {
+    const post = new THREE.Mesh(postGeo, postMat);
+    post.position.set(x, spec.h/2, z);
+    sceneRef.add(post);
+  });
+}
+
+async function renderOrientationCube(sku, oL, oW, oH, colorIndex) {
+  const localScene = new THREE.Scene();
+  localScene.background = new THREE.Color(0xffffff);
+  localScene.add(new THREE.AmbientLight(0xffffff, 0.95));
+  localScene.add(new THREE.HemisphereLight(0xffffff, 0xf1f5f9, 0.85));
+  const k = new THREE.DirectionalLight(0xffffff, 0.7); k.position.set(1.4, 2.0, 1.6); localScene.add(k);
+  const f = new THREE.DirectionalLight(0xffffff, 0.5); f.position.set(-1.4, 0.6, 1.4); localScene.add(f);
+  const r = new THREE.DirectionalLight(0xffffff, 0.35); r.position.set(-0.2, 0.5, -1.8); localScene.add(r);
+  const maxDim = Math.max(oL, oW, oH);
+  const scale = 1.6 / maxDim;
+  const dL = oL * scale, dH = oH * scale, dW = oW * scale;
+  const baseColor = SKU_PALETTE_PRINT[colorIndex % SKU_PALETTE_PRINT.length];
+  const c = new THREE.Color(baseColor);
+  const top = c.clone().lerp(new THREE.Color(0xffffff), 0.20);
+  const front = c.clone();
+  const side = c.clone().lerp(new THREE.Color(0x000000), 0.12);
+  const geo = new THREE.BoxGeometry(dL, dH, dW);
+  const mats = [
+    new THREE.MeshStandardMaterial({ color: side }),
+    new THREE.MeshStandardMaterial({ color: side }),
+    new THREE.MeshStandardMaterial({ color: top }),
+    new THREE.MeshStandardMaterial({ color: side }),
+    new THREE.MeshStandardMaterial({ color: front }),
+    new THREE.MeshStandardMaterial({ color: side })
+  ];
+  const mesh = new THREE.Mesh(geo, mats);
+  localScene.add(mesh);
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo),
+    new THREE.LineBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.9 }));
+  localScene.add(edges);
+  const sGeo = new THREE.PlaneGeometry(dL * 1.6, dW * 1.6);
+  const sMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.18 });
+  const sMesh = new THREE.Mesh(sGeo, sMat);
+  sMesh.rotation.x = -Math.PI / 2;
+  sMesh.position.y = -dH/2 - 0.001;
+  localScene.add(sMesh);
+  const S = 512;
+  const cam = new THREE.PerspectiveCamera(24, 1, 0.1, 100);
+  const d = 4.0;
+  cam.position.set(d*0.60, d*0.52, d*0.62);
+  cam.lookAt(0, 0, 0);
+  snapshotRenderer.setSize(S, S, false);
+  snapshotRenderer.render(localScene, cam);
+  const dataURL = snapshotRenderer.domElement.toDataURL('image/png');
+  localScene.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) {
+      if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+      else o.material.dispose();
+    }
+  });
+  return dataURL;
+}
+function groupKey(g) { return `${g.startIndex}-${g.endIndex}-${g.signature}`; }
+
+/* ============================================================
+   CALCULATE
+   ============================================================ */
+async function calculate() {
+  if (appMode !== 'auto') { showToast('Switch to Auto Plan mode.', 'warn'); return; }
+  const spec = CONTAINERS[document.getElementById('containerType').value];
+  const maxWeight = +document.getElementById('maxWeight').value;
+  const allowRotation = document.getElementById('allowRotation').checked;
+  const sliceDepth = +document.getElementById('sliceDepth').value;
+  if (cargoItems.length === 0) { alert('Add at least one item.'); return; }
+  buildContainer(spec);
+  resetView();
+  const packing = slicePacking(spec, cargoItems, { sliceDepth, allowRotation, maxWeight });
+  sliceHighlightIndex = -1;
+  renderCargo(packing);
+  renderLegend(packing);
+
+  const captureSlices = document.getElementById('captureSnapshots').checked;
+  const captureOrientation = document.getElementById('captureOrientation').checked;
+  if (captureSlices || captureOrientation) {
+    showToast('Rendering slice previews…', 'ok');
+    await captureAllSnapshots(packing);
+    const n1 = Object.keys(sliceSnapshots).length;
+    const n2 = Object.keys(orientationSnapshots).length;
+    showToast(`Ready · ${n1} slice images · ${n2} orientation cubes`, 'ok');
+  }
+
+  document.getElementById('report').innerHTML = buildReportHTML(packing, spec, {
+    sliceDepth, allowRotation, maxWeight,
+    includeSnapshots: captureSlices, includeOrientation: captureOrientation
+  }, sliceSnapshots, orientationSnapshots);
+  document.getElementById('report').style.display = 'block';
+  applyView(currentView);
+}
+
+/* ============================================================
+   REPORT
+   ============================================================ */
+function buildReportHTML(packing, spec, opts, snaps, orient) {
+  const client = document.getElementById('clientName').value || 'Client';
+  const containerVol = (spec.l * spec.w * spec.h) / 1e9;
+  const cargoVol = packing.slices.reduce((sum, sl) =>
+    sum + sl.placementCells.reduce((s, c) => s + c.l * c.w * c.h, 0), 0) / 1e9;
+  const util = ((cargoVol / containerVol) * 100).toFixed(0);
+  const totalWeight = packing.totalWeight;
+  const totalPacked = packing.totalPacked;
+  const weightPct = ((totalWeight / opts.maxWeight) * 100).toFixed(0);
+
+  let html = `<div class="rpt-header">
+    <h2>${escapeHTML(client)}</h2>
+    <div class="meta">${spec.name} · ${packing.slices.length} loading slices</div>
+    <div class="load-summary">
+      <div class="card"><div class="val">${totalPacked.toLocaleString()}</div><div class="lbl">Cartons</div></div>
+      <div class="card"><div class="val">${util}%</div><div class="lbl">Volume</div></div>
+      <div class="card"><div class="val">${weightPct}%</div><div class="lbl">Weight</div></div>
+    </div>
+    <div class="progress-bar"><div class="fill" style="width:${util}%"></div></div>
+    <div class="stats">
+      <div class="stat-block"><span class="k">Volume</span><span class="v">${cargoVol.toFixed(2)} / ${containerVol.toFixed(2)} m³</span></div>
+      <div class="stat-block"><span class="k">Weight</span><span class="v">${totalWeight.toLocaleString()} / ${opts.maxWeight.toLocaleString()} kg</span></div>
+    </div>
+  </div>`;
+
+  html += `<div class="rpt-section-title">Loading Order</div>`;
+  html += `<div class="step">Load from the <strong>back wall</strong> toward the doors. Each slice contains <strong>only one SKU</strong> — build the entire slice before moving to the next one.</div>`;
+
+  const groups = groupSlices(packing.slices);
+  groups.forEach(g => {
+    const sl = g.sample;
+    const titleRange = g.count === 1 ? `Slice ${g.startIndex}` : `Slices ${g.startIndex}-${g.endIndex}`;
+    const key = groupKey(g);
+    const imgSrc = snaps ? snaps[key] : null;
+
+    html += `<div class="slice-group">`;
+    html += `<div class="slice-head">${titleRange}</div>`;
+
+    // One SKU per slice — direct display
+    const it = sl.items[0];
+    const sku = packing.skus.find(k => k.id === it.skuId);
+    const colorHex = '#' + SKU_PALETTE[it.colorIndex].toString(16).padStart(6, '0');
+
+    const colsUsed = sl.cols;
+    const rowsUsed = sl.rowsUsed || sl.rowsMax;
+    const perSliceTotal = it.qty;
+
+    html += `<div class="slice-desc">
+      <span style="display:inline-block;width:10px;height:10px;background:${colorHex};border-radius:2px;margin-right:6px;vertical-align:middle;"></span>
+      <strong>${escapeHTML(it.name)}</strong> — <span class="num">${colsUsed}</span> across × <span class="num">${rowsUsed}</span> high = <strong>${perSliceTotal} cartons</strong> per slice
+    </div>`;
+    if (g.count > 1) {
+      html += `<div class="slice-desc" style="color:var(--text-muted);">same pattern, repeated ${g.count} times</div>`;
+    }
+    html += `<div class="slice-detail">Slice depth: ${(sl.depth/10).toFixed(0)} cm. Original carton: ${sku.l/10} × ${sku.w/10} × ${sku.h/10} cm.</div>`;
+    html += `<div class="slice-orient">Loaded orientation: ${it.name} as ${(Number(it.orientation.split('x')[0])/10).toFixed(0)} × ${(Number(it.orientation.split('x')[1])/10).toFixed(0)} × ${(Number(it.orientation.split('x')[2])/10).toFixed(0)} cm</div>`;
+
+    // Slice image
+    if (imgSrc) {
+      html += `<div class="slice-preview">
+        <img src="${imgSrc}" alt="${titleRange} preview">
+        <div class="caption">📷 ${titleRange} — axonometric view of this slice in the container</div>
+      </div>`;
+    }
+
+    // Orientation cube (single SKU)
+    if (orient && Object.keys(orient).length > 0) {
+      const cubeKey = `${key}::${it.skuId}`;
+      const cubeImg = orient[cubeKey];
+      if (cubeImg) {
+        const [oL, oW, oH] = it.orientation.split('x').map(Number);
+        const colorHexP = '#' + SKU_PALETTE_PRINT[it.colorIndex % SKU_PALETTE_PRINT.length].toString(16).padStart(6, '0');
+        html += `<div class="rpt-section-title" style="margin-top:14px;font-size:10px;">Orientation for this slice</div>`;
+        html += `<div class="orient-cards">
+          <div class="orient-card">
+            <div class="cube-wrap"><img src="${cubeImg}" alt="${it.name}"></div>
+            <div class="orient-info">
+              <div class="orient-name"><span class="dot" style="background:${colorHexP}"></span>
+                ${escapeHTML(it.name)} <span style="color:var(--text-dim);font-weight:400;">× ${it.qty}</span>
+              </div>
+              <div class="orient-qty">Original size: ${sku.l/10} × ${sku.w/10} × ${sku.h/10} cm</div>
+              <div class="orient-dims">
+                <span class="axis axis-x">X (depth)</span> ${(oL/10).toFixed(0)} cm ·
+                <span class="axis axis-y">Y (height)</span> ${(oH/10).toFixed(0)} cm ·
+                <span class="axis axis-z">Z (width)</span> ${(oW/10).toFixed(0)} cm
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }
+    }
+    html += `</div>`;
+  });
+
+  html += `<div class="rpt-section-title">Carton Mix Totals</div>`;
+  packing.skus.forEach(sk => {
+    const packed = sk.qty - sk.remaining;
+    const colorHex = '#' + SKU_PALETTE[sk.colorIndex].toString(16).padStart(6, '0');
+    const status = sk.remaining === 0
+      ? `<span style="color:var(--success);">✓ all loaded</span>`
+      : `<span style="color:var(--warning);">⚠ ${sk.remaining} left</span>`;
+    html += `<div class="step" style="border-left-color:${colorHex};"><strong>${packed}</strong> × ${escapeHTML(sk.name)} <span style="float:right;">${status}</span></div>`;
+  });
+
+  html += `<div class="rpt-section-title">Final Instructions</div>`;
+  html += `<div class="step">✔ Build from the back wall (X=0). Finish one full slice — one SKU — before moving to the next.</div>`;
+  html += `<div class="step">✔ Do NOT mix SKUs inside a slice. Any leftover space in a partial slice stays empty.</div>`;
+  html += `<div class="step">✔ Secure the load with dunnage or straps before closing the doors.</div>`;
+  return html;
+}
+
+function buildManualReportHTML(spec, opts) {
+  const client = document.getElementById('clientName').value || 'Client';
+  const containerVol = (spec.l * spec.w * spec.h) / 1e9;
+  const cargoVol = manualPlacements.reduce((s, p) => s + p.l * p.w * p.h, 0) / 1e9;
+  const util = ((cargoVol / containerVol) * 100).toFixed(0);
+  const totalWeight = manualPlacements.reduce((s, p) => {
+    const it = cargoItems.find(c => c.id === p.skuId);
+    return s + (it ? it.weight : 0);
+  }, 0);
+  const weightPct = ((totalWeight / opts.maxWeight) * 100).toFixed(0);
+  let html = `<div class="rpt-header">
+    <h2>${escapeHTML(client)}</h2>
+    <div class="meta">${spec.name} · MANUAL · ${manualPlacements.length} items</div>
+    <div class="load-summary">
+      <div class="card"><div class="val">${manualPlacements.length}</div><div class="lbl">Placed</div></div>
+      <div class="card"><div class="val">${util}%</div><div class="lbl">Volume</div></div>
+      <div class="card"><div class="val">${weightPct}%</div><div class="lbl">Weight</div></div>
+    </div>
+    <div class="progress-bar"><div class="fill" style="width:${util}%"></div></div>
+    <div class="stats">
+      <div class="stat-block"><span class="k">Volume</span><span class="v">${cargoVol.toFixed(2)} / ${containerVol.toFixed(2)} m³</span></div>
+      <div class="stat-block"><span class="k">Weight</span><span class="v">${totalWeight.toLocaleString()} / ${opts.maxWeight.toLocaleString()} kg</span></div>
+    </div>
+  </div>`;
+  html += `<div class="rpt-section-title">Placement Instructions</div>`;
+  const sorted = [...manualPlacements].sort((a, b) => a.x - b.x || a.z - b.z || a.y - b.y);
+  sorted.forEach((p, idx) => {
+    const sku = cargoItems.find(c => c.id === p.skuId);
+    const colorHex = '#' + SKU_PALETTE[p.colorIndex % SKU_PALETTE.length].toString(16).padStart(6, '0');
+    html += `<div class="step" style="border-left-color:${colorHex};">
+      <strong>${idx + 1}. ${escapeHTML(sku ? sku.name : 'Item')}</strong>
+      at X=${(p.x/10).toFixed(0)} · Y=${(p.y/10).toFixed(0)} · Z=${(p.z/10).toFixed(0)} cm
+      <br><small>Size: ${(p.l/10).toFixed(0)}×${(p.w/10).toFixed(0)}×${(p.h/10).toFixed(0)} cm${sku ? ` · ${sku.weight} kg` : ''}</small>
+    </div>`;
+  });
+  return html;
+}
+
+function escapeHTML(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function getReportContext() {
+  const spec = CONTAINERS[document.getElementById('containerType').value];
+  return {
+    spec,
+    opts: {
+      sliceDepth: +document.getElementById('sliceDepth').value,
+      allowRotation: document.getElementById('allowRotation').checked,
+      maxWeight: +document.getElementById('maxWeight').value
+    },
+    packing: window.__lastPacking
+  };
+}
+function toggleReport() {
+  const r = document.getElementById('report');
+  r.style.display = r.style.display === 'block' ? 'none' : 'block';
+}
+function toggleSliceView() {
+  if (appMode === 'manual') { showToast('Slice view is Auto Plan only.', 'warn'); return; }
+  sliceViewMode = !sliceViewMode;
+  document.getElementById('btnSliceView').classList.toggle('active', sliceViewMode);
+  if (sliceViewMode && sliceHighlightIndex < 0 && window.__lastPacking) sliceHighlightIndex = 1;
+  else if (!sliceViewMode) sliceHighlightIndex = -1;
+  if (window.__lastPacking) renderCargo(window.__lastPacking);
+  updateSliceButtons();
+}
+function stepSlice(dir) {
+  if (!window.__lastPacking) return;
+  if (!sliceViewMode) toggleSliceView();
+  const n = window.__lastPacking.slices.length;
+  if (n === 0) return;
+  sliceHighlightIndex += dir;
+  if (sliceHighlightIndex < 1) sliceHighlightIndex = 1;
+  if (sliceHighlightIndex > n) sliceHighlightIndex = n;
+  renderCargo(window.__lastPacking);
+  updateSliceButtons();
+}
+function updateSliceButtons() {
+  const n = window.__lastPacking?.slices.length || 0;
+  const cur = sliceHighlightIndex > 0 ? `Slice ${sliceHighlightIndex}/${n}` : 'All Slices';
+  document.getElementById('btnPrevSlice').disabled = sliceHighlightIndex <= 1;
+  document.getElementById('btnNextSlice').disabled = sliceHighlightIndex >= n;
+  document.getElementById('btnSliceView').textContent = sliceViewMode ? `Slice-by-Slice (${cur})` : 'Slice-by-Slice';
+}
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    if (tab.classList.contains('tab-btn')) return;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentView = tab.dataset.view;
+    applyView(currentView);
+  });
+});
+function applyView(view) {
+  const spec = currentContainerSpec || CONTAINERS[document.getElementById('containerType').value];
+  const cx = spec.l/2, cy = spec.h/2, cz = spec.w/2;
+  const d = Math.max(spec.l, spec.w, spec.h);
+  if (view === '3d') resetView();
+  else if (view === 'top') { camera.position.set(cx, cy + d*1.4, cz); controls.target.set(cx, 0, cz); controls.update(); }
+  else if (view === 'side') { camera.position.set(cx, cy, cz + d*1.4); controls.target.set(cx, cy, cz); controls.update(); }
+  else if (view === 'front') { camera.position.set(cx + d*1.4, cy, cz); controls.target.set(cx, cy, cz); controls.update(); }
+}
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  document.getElementById('themeBtn').textContent = isLight ? '☀️' : '🌙';
+  try { localStorage.setItem('fcl-theme', isLight ? 'light' : 'dark'); } catch(e) {}
+  applyThreeTheme();
+}
+function applyThreeTheme() {
+  if (!scene) return;
+  const T = getThemeColors();
+  scene.background = new THREE.Color(T.bg);
+  if (ambientLight) ambientLight.intensity = T.ambient;
+  if (hemiLight) { hemiLight.intensity = T.hemiSky; hemiLight.color = new THREE.Color(0xffffff); hemiLight.groundColor = new THREE.Color(T.bg); }
+  if (keyLight) keyLight.intensity = T.key;
+  if (fillLight) fillLight.intensity = T.fill;
+  if (gridHelper) {
+    scene.remove(gridHelper); gridHelper.geometry.dispose(); gridHelper.material.dispose();
+    gridHelper = new THREE.GridHelper(40000, 40, T.grid1, T.grid2);
+    gridHelper.position.y = -1; scene.add(gridHelper);
+  }
+  if (currentContainerSpec) buildContainer(currentContainerSpec);
+  if (appMode === 'auto' && window.__lastPacking) renderCargo(window.__lastPacking);
+  else if (appMode === 'manual') renderManualPlacements();
+}
+function toggleExportMenu(e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  const dd = document.getElementById('exportDropdown');
+  const willOpen = !dd.classList.contains('open');
+  document.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
+  if (willOpen) dd.classList.add('open');
+}
+document.addEventListener('click', (e) => {
+  if (e.target.closest && e.target.closest('#exportDropdown')) return;
+  document.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') document.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
+});
+function closeExportMenu() { document.getElementById('exportDropdown').classList.remove('open'); }
+function showToast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + type;
+  clearTimeout(t._timer); t._timer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* ============================================================
+   EXPORT / PRINT
+   ============================================================ */
+function getActiveReportHTML() {
+  const ctx = getReportContext();
+  if (appMode === 'manual') {
+    if (manualPlacements.length === 0) { alert('Place at least one item.'); return null; }
+    return { html: buildManualReportHTML(ctx.spec, ctx.opts), ctx, mode: 'manual' };
+  } else {
+    if (!window.__lastPacking) { alert('Generate a plan first.'); return null; }
+    return { html: buildReportHTML(ctx.packing, ctx.spec, ctx.opts, sliceSnapshots, orientationSnapshots), ctx, mode: 'auto' };
+  }
+}
+function printReport() {
+  closeExportMenu();
+  const r = getActiveReportHTML(); if (!r) return;
+  const client = document.getElementById('clientName').value || 'Client';
+  const ts = new Date().toLocaleString();
+  const css = `@page { size: A4 portrait; margin: 12mm 10mm; } * { box-sizing: border-box; }
+    body { font-family: sans-serif; color: #0f172a; background: #fff; font-size: 11.5px; margin: 0; padding: 0; }
+    .print-header { display: flex; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 14px; }
+    .brand { font-size: 16px; font-weight: 700; } .brand small { display: block; font-size: 10px; color: #64748b; font-weight: 400; }
+    .ts { font-size: 10px; color: #64748b; text-align: right; } .ts strong { color: #0f172a; display: block; font-size: 11px; }
+    .rpt-header { border-bottom: 1px solid #cbd5e1; padding-bottom: 10px; margin-bottom: 12px; }
+    .rpt-header h2 { font-size: 15px; margin-bottom: 2px; } .rpt-header .meta { color: #64748b; font-size: 11px; }
+    .load-summary { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin: 10px 0; }
+    .load-summary .card { background: #f1f5f9; border: 1px solid #e2e8f0; padding: 8px; border-radius: 6px; text-align: center; }
+    .load-summary .card .val { font-size: 16px; font-weight: 700; } .load-summary .card .lbl { font-size: 9px; color: #64748b; text-transform: uppercase; }
+    .progress-bar { height: 5px; background: #e2e8f0; border-radius: 3px; overflow: hidden; margin: 6px 0; } .progress-bar .fill { height: 100%; background: #2563eb; }
+    .rpt-header .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-top: 8px; }
+    .rpt-header .stat-block { display: flex; justify-content: space-between; } .stat-block .k { color: #64748b; font-size: 10.5px; } .stat-block .v { font-weight: 600; font-size: 11px; }
+    .rpt-section-title { color: #475569; margin: 14px 0 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; }
+    .slice-group { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; page-break-inside: avoid; }
+    .slice-head { font-size: 12.5px; font-weight: 700; margin-bottom: 4px; } .slice-desc { font-size: 11px; margin-bottom: 3px; } .slice-desc .num { color: #2563eb; font-weight: 700; } .slice-detail { font-size: 10.5px; color: #475569; margin-top: 4px; }
+    .slice-orient { color: #64748b; font-size: 10px; margin-top: 4px; padding-top: 4px; border-top: 1px dashed #e2e8f0; font-family: monospace; }
+    .slice-items { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+    .item-chip { display: inline-flex; align-items: center; gap: 4px; background: #fff; border: 1px solid #e2e8f0; padding: 2px 7px; border-radius: 10px; font-size: 10px; }
+    .item-chip .dot { width: 7px; height: 7px; border-radius: 2px; } .item-chip .qty { font-weight: 700; }
+    .slice-preview { margin-top: 10px; border-radius: 6px; overflow: hidden; border: 1px solid #cbd5e1; background: #fff; page-break-inside: avoid; }
+    .slice-preview img { display: block; width: 100%; height: auto; aspect-ratio: 16/10; object-fit: cover; }
+    .slice-preview .caption { padding: 5px 8px; font-size: 9.5px; color: #64748b; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center; }
+    .orient-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+    .orient-card { display: flex; gap: 8px; align-items: center; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 7px; }
+    .orient-card .cube-wrap { flex: 0 0 72px; height: 72px; background: #fff; border-radius: 4px; overflow: hidden; border: 1px solid #e2e8f0; }
+    .orient-card .cube-wrap img { width: 100%; height: 100%; object-fit: contain; }
+    .orient-card .orient-name { font-size: 11px; font-weight: 700; margin-bottom: 3px; }
+    .orient-card .orient-qty { font-size: 9.5px; color: #64748b; }
+    .orient-card .orient-dims { font-size: 9.5px; font-family: monospace; }
+    .orient-card .axis { display: inline-block; padding: 1px 4px; border-radius: 3px; font-weight: 700; font-size: 9px; margin-right: 2px; }
+    .axis-x { background: #fee2e2; color: #991b1b; } .axis-y { background: #dcfce7; color: #166534; } .axis-z { background: #dbeafe; color: #1e40af; }
+    .step { background: #f8fafc; padding: 7px 10px; border-radius: 5px; margin: 4px 0; border-left: 3px solid #2563eb; font-size: 10.5px; page-break-inside: avoid; }
+    .print-footer { margin-top: 16px; padding-top: 8px; border-top: 1px solid #cbd5e1; font-size: 9.5px; color: #64748b; display: flex; justify-content: space-between; }
+    @media print { body { -webkit-print-color-adjust: exact; } }`;
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Loading Plan</title><style>${css}</style></head><body>
+    <div class="print-header"><div class="brand">Container Loading Plan<small>FCL Container Loader${r.mode === 'manual' ? ' · Manual Layout' : ''}</small></div><div class="ts"><strong>Generated</strong>${escapeHTML(ts)}</div></div>
+    ${r.html}
+    <div class="print-footer"><span>Client: ${escapeHTML(client)} · ${escapeHTML(r.ctx.spec.name)}</span><span>FCL Container Loader</span></div>
+    <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),400));<\/script>
+    </body></html>`;
+  const w = window.open('', '_blank', 'width=900,height=1000');
+  if (!w) { showToast('Popup blocked', 'warn'); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+  showToast('Print preview opened', 'ok');
+}
+function exportHTML() {
+  closeExportMenu();
+  const r = getActiveReportHTML(); if (!r) return;
+  const client = document.getElementById('clientName').value || 'Client';
+  const ts = new Date().toLocaleString();
+  const css = `body{font-family:sans-serif;background:#eef2f7;color:#1e293b;padding:32px 20px;margin:0}
+    .container{max-width:960px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 10px 30px rgba(0,0,0,0.08)}
+    .doc-head{border-bottom:2px solid #0f172a;padding-bottom:12px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start}
+    .brand{font-size:20px;font-weight:700}.brand small{display:block;font-size:11px;font-weight:400;color:#64748b;margin-top:3px}
+    .ts{font-size:11px;color:#64748b;text-align:right}.ts strong{color:#0f172a;display:block;font-size:12px}
+    .rpt-header{border-bottom:1px solid #cbd5e1;padding-bottom:12px;margin-bottom:16px}.rpt-header h2{font-size:18px;margin-bottom:3px}
+    .load-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
+    .load-summary .card{background:#f1f5f9;border:1px solid #e2e8f0;padding:12px;border-radius:8px;text-align:center}
+    .load-summary .card .val{font-size:22px;font-weight:700}.load-summary .card .lbl{font-size:10px;color:#64748b;text-transform:uppercase}
+    .progress-bar{height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;margin:6px 0}.progress-bar .fill{height:100%;background:#2563eb}
+    .rpt-header .stats{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;margin-top:10px}.stat-block{display:flex;justify-content:space-between}
+    .stat-block .k{color:#64748b;font-size:11.5px}.stat-block .v{font-weight:600}
+    .rpt-section-title{color:#475569;margin:20px 0 8px;font-size:10.5px;text-transform:uppercase;letter-spacing:0.8px;font-weight:700;border-bottom:1px solid #e2e8f0;padding-bottom:4px}
+    .slice-group{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;margin-bottom:10px}
+    .slice-head{font-size:13.5px;font-weight:700;margin-bottom:6px}.slice-desc{font-size:12.5px;margin-bottom:4px}.slice-desc .num{color:#2563eb;font-weight:700}
+    .slice-preview{margin-top:10px;border-radius:8px;overflow:hidden;border:1px solid #cbd5e1;background:#fff}
+    .slice-preview img{display:block;width:100%;height:auto;aspect-ratio:16/10;object-fit:cover}
+    .slice-preview .caption{padding:7px 10px;font-size:11px;color:#64748b;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:center}
+    .orient-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+    .orient-card{display:flex;gap:12px;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px}
+    .orient-card .cube-wrap{flex:0 0 88px;height:88px;background:#fff;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0}
+    .orient-card .cube-wrap img{width:100%;height:100%;object-fit:contain}
+    .orient-card .orient-name{font-size:12.5px;font-weight:700;margin-bottom:3px}
+    .orient-card .orient-qty{font-size:10.5px;color:#64748b}
+    .orient-card .orient-dims{font-size:10.5px;font-family:monospace}
+    .orient-card .axis{display:inline-block;padding:1px 5px;border-radius:3px;font-weight:700;font-size:9.5px;margin-right:3px}
+    .axis-x{background:#fee2e2;color:#991b1b}.axis-y{background:#dcfce7;color:#166534}.axis-z{background:#dbeafe;color:#1e40af}
+    .item-chip{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #e2e8f0;padding:3px 9px;border-radius:12px;font-size:11.5px}
+    .item-chip .dot{width:9px;height:9px;border-radius:2px}.item-chip .qty{font-weight:700}
+    .step{background:#f8fafc;padding:10px 12px;border-radius:6px;margin:6px 0;border-left:3px solid #2563eb;font-size:12px}
+    .doc-footer{margin-top:24px;padding-top:12px;border-top:1px solid #cbd5e1;font-size:11px;color:#64748b;text-align:center}`;
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Loading Plan — ${escapeHTML(client)}</title><style>${css}</style></head><body>
+    <div class="container"><div class="doc-head"><div class="brand">Container Loading Plan<small>FCL Container Loader${r.mode === 'manual' ? ' · Manual Layout' : ''}</small></div><div class="ts"><strong>Generated</strong>${escapeHTML(ts)}</div></div>
+    ${r.html}<div class="doc-footer">Client: ${escapeHTML(client)} · ${escapeHTML(r.ctx.spec.name)}</div></div></body></html>`;
+  downloadFile(`loading-plan-${sanitize(client)}-${dateStamp()}.html`, html, 'text/html');
+  showToast('HTML report downloaded', 'ok');
+}
+function exportCSV() {
+  closeExportMenu();
+  const client = document.getElementById('clientName').value || 'Client';
+  if (appMode === 'manual') {
+    const spec = CONTAINERS[document.getElementById('containerType').value];
+    const rows = [['# MANUAL Plan'], ['# Client', client], ['# Container', spec.name], []];
+    rows.push(['#', 'Item', 'L_cm', 'W_cm', 'H_cm', 'X_cm', 'Y_cm', 'Z_cm']);
+    const sorted = [...manualPlacements].sort((a, b) => a.x - b.x || a.z - b.z || a.y - b.y);
+    sorted.forEach((p, i) => {
+      const sku = cargoItems.find(c => c.id === p.skuId);
+      rows.push([i+1, sku ? sku.name : '', (p.l/10).toFixed(0), (p.w/10).toFixed(0), (p.h/10).toFixed(0),
+        (p.x/10).toFixed(0), (p.y/10).toFixed(0), (p.z/10).toFixed(0)]);
+    });
+    const csv = rows.map(r => r.map(csvCell).join(',')).join('\r\n');
+    downloadFile(`loading-plan-manual-${sanitize(client)}-${dateStamp()}.csv`, '\ufeff' + csv, 'text/csv');
+    showToast('Manual CSV downloaded', 'ok');
+    return;
+  }
+  if (!window.__lastPacking) { alert('Generate a plan first.'); return; }
+  const ctx = getReportContext();
+  const rows = [['# Auto Plan Slices'], ['# Client', client], []];
+  rows.push(['Slice', 'SKU', 'Cols', 'Rows', 'Qty', 'Orientation_L_cm', 'Orientation_W_cm', 'Orientation_H_cm']);
+  const groups = groupSlices(ctx.packing.slices);
+  groups.forEach(g => {
+    const sl = g.sample;
+    const lbl = g.count === 1 ? `Slice ${g.startIndex}` : `Slices ${g.startIndex}-${g.endIndex} (x${g.count})`;
+    const it = sl.items[0];
+    const [oL, oW, oH] = it.orientation.split('x').map(Number);
+    rows.push([lbl, it.name, sl.cols, sl.rowsUsed || sl.rowsMax, it.qty,
+      (oL/10).toFixed(0), (oW/10).toFixed(0), (oH/10).toFixed(0)]);
+  });
+  const csv = rows.map(r => r.map(csvCell).join(',')).join('\r\n');
+  downloadFile(`loading-plan-slices-${sanitize(client)}-${dateStamp()}.csv`, '\ufeff' + csv, 'text/csv');
+  showToast('Slices CSV downloaded', 'ok');
+}
+function exportSKUsCSV() {
+  closeExportMenu();
+  const client = document.getElementById('clientName').value || 'Client';
+  const rows = [['# SKU Summary'], []];
+  rows.push(['Name', 'L_cm', 'W_cm', 'H_cm', 'Weight_kg', 'Qty']);
+  cargoItems.forEach(sku => rows.push([sku.name, (sku.l/10).toFixed(0), (sku.w/10).toFixed(0), (sku.h/10).toFixed(0), sku.weight, sku.qty]));
+  const csv = rows.map(r => r.map(csvCell).join(',')).join('\r\n');
+  downloadFile(`sku-summary-${sanitize(client)}-${dateStamp()}.csv`, '\ufeff' + csv, 'text/csv');
+  showToast('SKU CSV downloaded', 'ok');
+}
+function csvCell(v) {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  if (/[",\r\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function copyReportText() {
+  closeExportMenu();
+  const lines = [];
+  const client = document.getElementById('clientName').value || 'Client';
+  lines.push(client);
+  const spec = CONTAINERS[document.getElementById('containerType').value];
+  lines.push(spec.name);
+  if (appMode === 'manual') {
+    lines.push(`MANUAL — ${manualPlacements.length} items`);
+    const sorted = [...manualPlacements].sort((a, b) => a.x - b.x || a.z - b.z || a.y - b.y);
+    sorted.forEach((p, i) => {
+      const sku = cargoItems.find(c => c.id === p.skuId);
+      lines.push(`  ${i+1}. ${sku ? sku.name : ''} at X=${(p.x/10).toFixed(0)} Y=${(p.y/10).toFixed(0)} Z=${(p.z/10).toFixed(0)} cm`);
+    });
+  } else if (window.__lastPacking) {
+    const groups = groupSlices(window.__lastPacking.slices);
+    groups.forEach(g => {
+      const sl = g.sample;
+      const it = sl.items[0];
+      const label = g.count === 1 ? `Slice ${g.startIndex}` : `Slices ${g.startIndex}-${g.endIndex} (same pattern ×${g.count})`;
+      lines.push(`${label}: ${it.qty} × ${it.name} — ${sl.cols} across × ${sl.rowsUsed || sl.rowsMax} high`);
+    });
+  }
+  navigator.clipboard.writeText(lines.join('\n')).then(() => showToast('Copied', 'ok'));
+}
+function exportSnapshotsZIP() {
+  closeExportMenu();
+  if (appMode === 'manual') { showToast('Snapshots only in Auto Plan.', 'warn'); return; }
+  if (!window.__lastPacking) { alert('Generate a plan first.'); return; }
+  const ctx = getReportContext();
+  const client = document.getElementById('clientName').value || 'Client';
+  const groups = groupSlices(ctx.packing.slices);
+  let gHTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Snapshots — ${escapeHTML(client)}</title></head><body style="font-family:sans-serif;padding:24px;background:#eef2f7"><h1>Slice Snapshots</h1>`;
+  groups.forEach(g => {
+    const sl = g.sample; const key = groupKey(g); const img = sliceSnapshots[key];
+    const it = sl.items[0];
+    const title = g.count === 1 ? `Slice ${g.startIndex}` : `Slices ${g.startIndex}-${g.endIndex} (×${g.count})`;
+    gHTML += `<div style="margin-bottom:24px;background:#fff;padding:16px;border-radius:8px"><h3>${title} — ${escapeHTML(it.name)}</h3>
+      <p>${sl.cols} across × ${sl.rowsUsed || sl.rowsMax} high = ${it.qty} cartons</p>`;
+    if (img) gHTML += `<img src="${img}" style="width:100%;border:1px solid #ccc;border-radius:6px">`;
+    gHTML += `</div>`;
+  });
+  gHTML += `</body></html>`;
+  downloadFile(`slice-snapshots-${sanitize(client)}-${dateStamp()}.html`, gHTML, 'text/html');
+  showToast('Snapshot gallery downloaded', 'ok');
+}
+function exportManualToReport() {
+  const ctx = getReportContext();
+  if (manualPlacements.length === 0) { alert('Place at least one item first.'); return; }
+  document.getElementById('report').innerHTML = buildManualReportHTML(ctx.spec, ctx.opts);
+  document.getElementById('report').style.display = 'block';
+  showToast('Report built', 'ok');
+}
+function downloadFile(filename, content, mime) {
+  const blob = new Blob([content], { type: mime + ';charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+function sanitize(s) { return String(s).replace(/[^a-z0-9\-_]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'report'; }
+function dateStamp() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+}
+
+window.addEventListener('load', () => {
+  let saved = 'dark';
+  try { saved = localStorage.getItem('fcl-theme') || 'dark'; } catch(e) {}
+  if (saved === 'light') {
+    document.body.classList.add('light');
+    document.getElementById('themeBtn').textContent = '☀️';
+  }
+  renderPresetButtons();
+  loadSample();
+  initThree();
+  const spec = CONTAINERS['40'];
+  buildContainer(spec);
+  resetView();
+});
+</script>
+</body></html>
