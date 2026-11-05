@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FCL Container Loading Calculator</title>
 <style>
   :root {
@@ -304,13 +305,28 @@
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .toast.ok { border-left: 3px solid var(--success); }
   .toast.warn { border-left: 3px solid var(--warning); }
+
+/* Full-shipment dashboard */
+:root { --accent:#24a994; --accent-hover:#198775; --accent-soft:#52d3bb; }
+#sidebar {width:370px;padding:24px} h1 {font-size:21px;letter-spacing:-.5px}.subtitle {line-height:1.6;margin-top:8px}
+.section {border-radius:12px;padding:16px} input,select {padding:10px} #main {min-width:0}
+#shipmentSummary {margin:20px 22px 12px;padding:20px;background:var(--bg-sidebar);border:1px solid var(--border-strong);border-radius:14px;max-height:38vh;overflow:auto;flex-shrink:0}
+#shipmentSummary h2 {font-size:22px;letter-spacing:-.5px;margin:6px 0;color:var(--text-primary)}
+.eyebrow {font-size:10px;letter-spacing:1.8px;color:var(--accent-soft);font-weight:700}.shipment-note {font-size:11px;line-height:1.7;color:var(--text-muted);margin-top:10px}
+.shipment-heading {display:flex;justify-content:space-between;align-items:center;gap:12px}.shipment-heading button {width:auto;background:var(--bg-input);color:var(--text-body);border:1px solid var(--border-strong);margin:0}
+.shipment-stats {display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:20px 0}.shipment-stats b {display:block;font-size:24px;color:var(--text-primary)}.shipment-stats small {font-size:13px;color:var(--text-muted)}.shipment-stats span {display:block;font-size:11px;color:var(--text-muted);margin-top:6px}
+.container-picker {display:flex;overflow:auto;gap:8px;padding-bottom:5px}.container-picker button {flex-shrink:0;width:auto;min-width:155px;text-align:left;background:var(--bg-input);color:var(--text-body);border:1px solid var(--border-strong);margin:0;padding:12px 16px}.container-picker .selected {border-color:var(--accent);color:var(--accent-soft)}.container-picker span {display:block;font-size:10px;margin-top:6px;color:var(--text-muted)}
+.shipment-warning {color:var(--warning);background:#a162071a;padding:12px;line-height:1.6;border-radius:8px;margin-bottom:12px}button:disabled {opacity:.5;cursor:wait}button:focus-visible {outline:2px solid var(--accent);outline-offset:3px}#viewer {min-height:260px}
+@media(max-width:1000px) {#sidebar {width:320px;padding:16px}.shipment-stats {gap:8px}.shipment-stats b {font-size:20px}}
+@media(max-width:720px) {html,body {height:auto;overflow:auto}body {display:flex;flex-direction:column}#sidebar {width:100%;overflow:visible}#main {width:100%;min-height:800px}#shipmentSummary {max-height:none;margin:16px 12px;padding:16px}#viewer {height:540px;flex:none}#tabs {flex-wrap:wrap}#report {width:calc(100% - 24px);right:12px}.shipment-stats {grid-template-columns:1fr 1fr}#controls {flex-wrap:wrap;max-width:95%}}
+
 </style>
 </head>
 <body>
 
 <div id="sidebar">
   <h1>FCL Container Loader</h1>
-  <p class="subtitle">Pure-SKU slices · real pallet dimensions</p>
+  <p class="subtitle">Full quantities · multiple containers · clear loading plans</p>
 
   <div class="mode-switch">
     <button class="mode-btn active" id="modeAutoBtn" onclick="setMode('auto')">🔄 Auto Plan</button>
@@ -341,15 +357,14 @@
 
   <div class="section" id="autoRulesSection">
     <h2>Auto Loading Rules</h2>
-    <label>Slice depth (cm)</label>
-    <input type="number" id="sliceDepth" value="60" step="5">
-    <label><input type="checkbox" id="allowRotation" checked style="width:auto; margin-right:8px;"> Allow 90° rotation</label>
-    <label><input type="checkbox" id="captureSnapshots" checked style="width:auto; margin-right:8px;"> Include slice images in report</label>
-    <label><input type="checkbox" id="captureOrientation" checked style="width:auto; margin-right:8px;"> Include orientation cubes</label>
+    <input type="hidden" id="sliceDepth" value="60"><p class="shipment-note">Enter your entire shipment quantity. Row depth adapts to the cargo; remaining units continue into the next container.</p>
+    <label><input type="checkbox" id="allowRotation" checked style="width:auto; margin-right:8px;"> Allow floor rotation (keep upright)</label>
+    <label><input type="checkbox" id="captureSnapshots" style="width:auto; margin-right:8px;"> Include slice images in report</label>
+    <label><input type="checkbox" id="captureOrientation" style="width:auto; margin-right:8px;"> Include orientation cubes</label>
   </div>
 
-  <button class="btn-primary" id="mainActionBtn" onclick="calculate()">▶ Generate Loading Plan</button>
-  <button class="btn-secondary" onclick="loadSample()">Load Sample (Container A)</button>
+  <button class="btn-primary" id="mainActionBtn" onclick="calculate()">Calculate full shipment</button>
+  <button class="btn-secondary" onclick="loadSample()">Load example shipment</button>
 
   <div class="section" id="manualHelpSection" style="display:none;">
     <h2>Manual Mode Guide</h2>
@@ -367,6 +382,7 @@
 </div>
 
 <div id="main">
+  <section id="shipmentSummary" aria-live="polite"><span class="eyebrow">SHIPMENT WORKSPACE</span><h2>Will all your cartons fit?</h2><p class="shipment-note">Enter dimensions, gross unit weight and the full quantity. Calculate to see how many containers you need.</p></section>
   <div id="tabs">
     <div class="tab active" data-view="3d">3D</div>
     <div class="tab" data-view="top">Top</div>
@@ -1019,6 +1035,8 @@ function rotateManualOrientation() {
 }
 
 function setMode(mode) {
+  if (planBusy) return;
+  document.getElementById("shipmentSummary").hidden = mode !== "auto";
   appMode = mode;
   document.getElementById('modeAutoBtn').classList.toggle('active', mode === 'auto');
   document.getElementById('modeManualBtn').classList.toggle('active', mode === 'manual');
@@ -1027,7 +1045,7 @@ function setMode(mode) {
   document.getElementById('autoRulesSection').style.display = mode === 'auto' ? 'block' : 'none';
   const btn = document.getElementById('mainActionBtn');
   if (mode === 'auto') {
-    btn.textContent = '▶ Generate Loading Plan';
+    btn.textContent = 'Calculate full shipment';
     btn.onclick = calculate;
   } else {
     btn.textContent = '✋ Manual mode — click floor';
@@ -1046,6 +1064,7 @@ function setMode(mode) {
   resetView();
 }
 function onContainerChange() {
+  invalidateShipment();
   const spec = CONTAINERS[document.getElementById('containerType').value];
   buildContainer(spec);
   if (appMode === 'manual') renderManualPlacements();
@@ -1065,11 +1084,11 @@ function renderPresetButtons() {
     b.textContent = `+ ${p.name}`;
     b.onclick = () => {
       cargoIdCounter++;
-      const totalH = p.deckH + p.loadH;
+      const totalH = p.deckH ? p.deckH + p.loadH : p.h;
       cargoItems.push({
         id: cargoIdCounter, name: p.name,
         l: p.l, w: p.w, h: totalH,
-        weight: p.weight + 200, qty: 20,
+        weight: p.deckH ? p.weight + 200 : p.weight, qty: 20,
         deckH: p.deckH, gap: p.gap
       });
       renderCargoList();
@@ -1079,6 +1098,7 @@ function renderPresetButtons() {
   });
 }
 function renderCargoList() {
+  invalidateShipment();
   const list = document.getElementById('cargoList');
   list.innerHTML = '';
   cargoItems.forEach((c, idx) => {
@@ -1089,7 +1109,7 @@ function renderCargoList() {
       <div class="sku-tag" style="color:${colorHex}">SKU ${idx + 1}</div>
       <button class="remove" onclick="removeCargo(${c.id})">×</button>
       <label>Name</label>
-      <input type="text" value="${c.name}" onchange="updateCargo(${c.id},'name',this.value)">
+      <input type="text" value="${escapeHTML(c.name)}" onchange="updateCargo(${c.id},'name',this.value)">
       <div class="row">
         <div><label>Length (cm)</label><input type="number" value="${(c.l/10).toFixed(1)}" step="0.1" onchange="updateCargo(${c.id},'l',Math.round(+this.value*10))"></div>
         <div><label>Width (cm)</label><input type="number" value="${(c.w/10).toFixed(1)}" step="0.1" onchange="updateCargo(${c.id},'w',Math.round(+this.value*10))"></div>
@@ -1130,6 +1150,7 @@ function removeCargo(id) {
 function updateCargo(id, field, value) {
   const c = cargoItems.find(x => x.id === id);
   if (c) c[field] = value;
+  invalidateShipment();
 }
 function loadSample() {
   cargoIdCounter = 0;
@@ -1173,148 +1194,57 @@ function renderLegend(packing) {
    4. Only when a SKU runs out do we advance to the next SKU
       and start a new block of slices.
    ============================================================ */
+// Dimensions in millimeters; upright, supported single-SKU rows.
+// A feasible heuristic, not a guarantee of the minimum container count.
+function validateShipment(items, opts) {
+  if (!items.length) throw new Error('Add at least one cargo item.');
+  if (!Number.isFinite(opts.maxWeight) || opts.maxWeight <= 0) throw new Error('Enter a positive payload in kg.');
+  let total = 0;
+  for (const c of items) {
+    if (![c.l,c.w,c.h,c.weight].every(n => Number.isFinite(n) && n > 0)) throw new Error('Every SKU needs positive dimensions and weight.');
+    if (!Number.isSafeInteger(c.qty) || c.qty < 0) throw new Error('Quantities must be whole numbers, zero or greater.');
+    total += c.qty;
+  }
+  if (!total) throw new Error('Enter at least one unit to load.');
+  if (total > 50000) throw new Error('Plan up to 50,000 units at a time. Split larger shipments.');
+}
 function slicePacking(spec, items, opts) {
-  const { sliceDepth, allowRotation, maxWeight } = opts;
-
-  // Sort SKUs by volume DESC so large boxes get the back-of-container real estate
-  const skus = items.map((it, i) => ({
-    id: it.id, name: it.name,
-    l: it.l, w: it.w, h: it.h,
-    weight: it.weight, qty: it.qty, remaining: it.qty,
-    colorIndex: i % SKU_PALETTE.length,
-    eL: it.l, eW: it.w, eH: it.h
-  }));
-  const sliceDepthMm = sliceDepth * 10;
-
-  // Pick best orientation: length along container X (must fit sliceDepth)
-  skus.forEach(sku => {
-    const cands = [];
-    if (allowRotation) {
-      const perms = [
-        [sku.l, sku.w, sku.h], [sku.l, sku.h, sku.w],
-        [sku.w, sku.l, sku.h], [sku.w, sku.h, sku.l],
-        [sku.h, sku.l, sku.w], [sku.h, sku.w, sku.l]
-      ];
-      perms.forEach(p => cands.push({ x: p[0], y: p[1], z: p[2] }));
-    } else {
-      cands.push({ x: sku.l, y: sku.h, z: sku.w });
-    }
-    let best = null;
-    cands.forEach(c => {
-      if (c.x > sliceDepthMm + 5) return;
-      const xDiff = Math.abs(c.x - sliceDepthMm);
-      const cols = Math.floor(spec.w / c.z);
-      const rowsH = Math.floor(spec.h / c.y);
-      if (cols < 1 || rowsH < 1) return;
-      const score = (cols * rowsH) * 10000 - xDiff;
-      if (!best || score > best.score) best = { ...c, score };
-    });
-    if (best) { sku.eL = best.x; sku.eH = best.y; sku.eW = best.z; }
-  });
-
-  // Order SKUs: heaviest first (goes low, at back), then larger volume
-  const orderedSkus = [...skus].sort((a, b) => {
-    const wDiff = b.weight - a.weight;
-    if (Math.abs(wDiff) > 0.5) return wDiff;
-    return (b.l * b.w * b.h) - (a.l * a.w * a.h);
-  }).filter(s => s.remaining > 0 && s.eW > 0 && s.eH > 0);
-
-  const numSlicesAvailable = Math.floor(spec.l / sliceDepthMm);
+  const skus = items.map((c,i)=>({...c,remaining:c.qty,colorIndex:i%SKU_PALETTE.length,eL:c.l,eW:c.w,eH:c.h}));
   const slices = [];
-  let totalWeight = 0, totalPacked = 0;
-  let sliceIdx = 0; // global slice counter
-
-  // For each SKU in turn, allocate a contiguous run of slices
-  for (const sku of orderedSkus) {
-    if (sliceIdx >= numSlicesAvailable) break;
-    if (sku.remaining === 0) continue;
-
-    const cols = Math.floor(spec.w / sku.eW);
-    const rowsPerSlice = Math.floor(spec.h / sku.eH);
-    const perSlice = cols * rowsPerSlice;
-    if (perSlice < 1) {
-      // This SKU cannot fit even one slice — try to load without slices (fallback)
-      continue;
-    }
-
-    // Keep filling slices until SKU is exhausted or container is full
-    while (sku.remaining > 0 && sliceIdx < numSlicesAvailable) {
-      // Weight check
-      const maxByWeight = Math.floor((maxWeight - totalWeight) / sku.weight);
-      if (maxByWeight < 1) break;
-
-      const inThisSlice = Math.min(perSlice, sku.remaining, maxByWeight);
-      const fullRowsInSlice = Math.floor(inThisSlice / cols);
-      const remainderInLastRow = inThisSlice % cols;
-
-      const slice = {
-        index: sliceIdx + 1,
-        depth: sliceDepthMm,
-        xStart: sliceIdx * sliceDepthMm,
-        cols: cols,
-        rowsMax: rowsPerSlice,
-        items: [],
-        placementCells: []
-      };
-
-      let placed = 0;
-      // Fill full rows first (col 1..cols each row)
-      for (let row = 0; row < fullRowsInSlice; row++) {
-        for (let col = 0; col < cols; col++) {
-          slice.placementCells.push({
-            x: slice.xStart,
-            y: row * sku.eH,
-            z: col * sku.eW,
-            l: sku.eL, w: sku.eW, h: sku.eH,
-            skuId: sku.id, skuName: sku.name,
-            colorIndex: sku.colorIndex,
-            col: col + 1, row: row + 1
-          });
-          placed++;
-        }
+  let x = 0, totalWeight = 0, totalPacked = 0;
+  for (const sku of [...skus].sort((a,b)=>b.weight-a.weight || b.l*b.w*b.h-a.l*a.w*a.h)) {
+    while (sku.remaining > 0) {
+      const orientations = [[sku.l,sku.w,sku.h]];
+      if (opts.allowRotation) orientations.push([sku.w,sku.l,sku.h]);
+      let best = null;
+      for (const [l,w,h] of orientations) {
+        const cols = Math.floor(spec.w/w), rows = Math.floor(spec.h/h);
+        if (l > spec.l-x || !cols || !rows) continue;
+        const count = Math.min(cols*rows,sku.remaining,Math.floor((opts.maxWeight-totalWeight+1e-8)/sku.weight));
+        if (count > 0 && (!best || count/l > best.count/best.l)) best = {l,w,h,cols,count};
       }
-      // If a partial row remains, place only that many in the next row
-      if (remainderInLastRow > 0) {
-        const row = fullRowsInSlice;
-        for (let col = 0; col < remainderInLastRow; col++) {
-          slice.placementCells.push({
-            x: slice.xStart,
-            y: row * sku.eH,
-            z: col * sku.eW,
-            l: sku.eL, w: sku.eW, h: sku.eH,
-            skuId: sku.id, skuName: sku.name,
-            colorIndex: sku.colorIndex,
-            col: col + 1, row: row + 1
-          });
-          placed++;
-        }
-      }
-
-      // Add slice items entry (SINGLE SKU — this is the key)
-      slice.items.push({
-        skuId: sku.id,
-        name: sku.name,
-        colorIndex: sku.colorIndex,
-        qty: placed,
-        orientation: `${sku.eL}x${sku.eW}x${sku.eH}`
-      });
-
-      slice.totalCartons = placed;
-      // The effective rows used (for display): max row that has any box
-      let rowsUsed = fullRowsInSlice + (remainderInLastRow > 0 ? 1 : 0);
-      slice.rowsUsed = rowsUsed;
-      slice.rowsMax = rowsUsed; // keep rowsMax as the count actually used
-
-      sku.remaining -= placed;
-      totalWeight += placed * sku.weight;
-      totalPacked += placed;
-
-      slices.push(slice);
-      sliceIdx++;
+      if (!best) break;
+      const {l,w,h,cols,count} = best;
+      const placementCells = Array.from({length:count},(_,i)=>({x,y:Math.floor(i/cols)*h,z:(i%cols)*w,l,w,h,skuId:sku.id,skuName:sku.name,colorIndex:sku.colorIndex,col:i%cols+1,row:Math.floor(i/cols)+1}));
+      slices.push({index:slices.length+1,depth:l,xStart:x,cols,rowsMax:Math.ceil(count/cols),rowsUsed:Math.ceil(count/cols),totalCartons:count,placementCells,
+        items:[{skuId:sku.id,name:sku.name,colorIndex:sku.colorIndex,qty:count,orientation:`${l}x${w}x${h}`}]});
+      Object.assign(sku,{eL:l,eW:w,eH:h});
+      sku.remaining -= count; totalWeight += count*sku.weight; totalPacked += count; x += l;
     }
   }
-
-  return { slices, skus, totalWeight, totalPacked };
+  return {slices,skus,totalWeight,totalPacked};
+}
+function planShipment(spec, items, opts) {
+  validateShipment(items,opts);
+  const containers = [];
+  let remaining = items.map(c=>({...c}));
+  while (remaining.some(c=>c.qty>0) && containers.length < 100) {
+    const packing = slicePacking(spec,remaining,opts);
+    if (!packing.totalPacked) break;
+    containers.push(packing);
+    remaining = remaining.map(c=>({...c,qty:packing.skus.find(s=>s.id===c.id).remaining}));
+  }
+  return {spec,opts,containers,remaining:remaining.filter(c=>c.qty>0),requested:items.reduce((n,c)=>n+c.qty,0)};
 }
 
 /* Group slices — smarter: same SKU + same layout + same qty per slice */
@@ -1592,36 +1522,72 @@ function groupKey(g) { return `${g.startIndex}-${g.endIndex}-${g.signature}`; }
 /* ============================================================
    CALCULATE
    ============================================================ */
+let shipmentPlan = null;
+let activeContainer = 0;
+let planBusy = false;
+function renderShipmentSummary() {
+  const p = shipmentPlan;
+  if (!p) return;
+  const left = p.remaining.reduce((n,c)=>n+c.qty,0);
+  const weight = p.containers.reduce((n,c)=>n+c.totalWeight,0);
+  document.getElementById('shipmentSummary').innerHTML = `
+    <div class="shipment-heading"><div><span class="eyebrow">FULL SHIPMENT PLAN</span><h2>${left ? 'Shipment needs attention' : `Fits in ${p.containers.length} container${p.containers.length===1?'':'s'}`}</h2></div><button onclick="exportShipmentCSV()">↓ Shipment CSV</button></div>
+    <div class="shipment-stats"><div><b>${p.containers.length}</b><span>Containers planned</span></div><div><b>${(p.requested-left).toLocaleString()} <small>/ ${p.requested.toLocaleString()}</small></b><span>Units allocated</span></div><div><b>${weight.toLocaleString(undefined,{maximumFractionDigits:1})} <small>kg</small></b><span>Total loaded weight</span></div></div>
+    ${left ? `<p class="shipment-warning">${left.toLocaleString()} units unallocated: ${p.remaining.map(c=>`${escapeHTML(c.name)} (${c.qty})`).join(', ')}. Check oversized/overweight cargo or the 100-container planning limit.</p>` : ''}
+    <div class="container-picker">${p.containers.map((c,i)=>`<button class="${i===activeContainer?'selected':''}" onclick="selectShipmentContainer(${i})" ${planBusy?'disabled':''}>Container ${i+1}<span>${c.totalPacked.toLocaleString()} units · ${(100*c.totalWeight/p.opts.maxWeight).toFixed(0)}% payload</span></button>`).join('')}</div>
+    <p class="shipment-note">${escapeHTML(p.spec.name)} · Conservative row-based estimate, not a guaranteed minimum. Verify door clearance, stackability and securing. Reports and 3D show the selected container.</p>`;
+}
 async function calculate() {
-  if (appMode !== 'auto') { showToast('Switch to Auto Plan mode.', 'warn'); return; }
-  const spec = CONTAINERS[document.getElementById('containerType').value];
-  const maxWeight = +document.getElementById('maxWeight').value;
-  const allowRotation = document.getElementById('allowRotation').checked;
-  const sliceDepth = +document.getElementById('sliceDepth').value;
-  if (cargoItems.length === 0) { alert('Add at least one item.'); return; }
-  buildContainer(spec);
-  resetView();
-  const packing = slicePacking(spec, cargoItems, { sliceDepth, allowRotation, maxWeight });
-  sliceHighlightIndex = -1;
-  renderCargo(packing);
-  renderLegend(packing);
-
-  const captureSlices = document.getElementById('captureSnapshots').checked;
-  const captureOrientation = document.getElementById('captureOrientation').checked;
-  if (captureSlices || captureOrientation) {
-    showToast('Rendering slice previews…', 'ok');
-    await captureAllSnapshots(packing);
-    const n1 = Object.keys(sliceSnapshots).length;
-    const n2 = Object.keys(orientationSnapshots).length;
-    showToast(`Ready · ${n1} slice images · ${n2} orientation cubes`, 'ok');
-  }
-
-  document.getElementById('report').innerHTML = buildReportHTML(packing, spec, {
-    sliceDepth, allowRotation, maxWeight,
-    includeSnapshots: captureSlices, includeOrientation: captureOrientation
-  }, sliceSnapshots, orientationSnapshots);
-  document.getElementById('report').style.display = 'block';
-  applyView(currentView);
+  if (appMode !== 'auto' || planBusy) return;
+  try {
+    const spec = CONTAINERS[document.getElementById('containerType').value];
+    const opts = {maxWeight:+document.getElementById('maxWeight').value,allowRotation:document.getElementById('allowRotation').checked,sliceDepth:0};
+    const next = planShipment(spec,cargoItems,opts);
+    shipmentPlan = next; activeContainer = 0;
+    renderShipmentSummary();
+    if (next.containers.length) await selectShipmentContainer(0);
+    else { renderCargo(null); document.getElementById('report').innerHTML=''; }
+  } catch(e) { showToast(e.message,'warn'); }
+}
+async function selectShipmentContainer(index) {
+  if (planBusy || !shipmentPlan?.containers[index]) return;
+  const plan = shipmentPlan;
+  const {spec,opts} = plan, packing = plan.containers[index];
+  planBusy = true; activeContainer = index;
+  document.getElementById('mainActionBtn').disabled = true;
+  renderShipmentSummary();
+  try {
+    buildContainer(spec); resetView(); sliceHighlightIndex = -1;
+    renderCargo(packing); renderLegend(packing);
+    sliceSnapshots = {}; orientationSnapshots = {};
+    const includeSnapshots = document.getElementById('captureSnapshots').checked;
+    const includeOrientation = document.getElementById('captureOrientation').checked;
+    if (includeSnapshots || includeOrientation) await captureAllSnapshots(packing);
+    if (shipmentPlan !== plan) return;
+    document.getElementById('report').innerHTML = `<p class="shipment-note">Container ${index+1} of ${plan.containers.length}</p>` + buildReportHTML(packing,spec,{...opts,includeSnapshots,includeOrientation},sliceSnapshots,orientationSnapshots);
+    document.getElementById('report').style.display = 'none';
+    applyView(currentView);
+  } catch(e) { showToast('Could not render preview: '+e.message,'warn'); }
+  finally { planBusy=false; document.getElementById('mainActionBtn').disabled=false; renderShipmentSummary(); }
+}
+function invalidateShipment() {
+  if (!shipmentPlan) return;
+  shipmentPlan = null; window.__lastPacking = null;
+  sliceSnapshots = {}; orientationSnapshots = {};
+  document.getElementById('report').innerHTML = '';
+  document.getElementById('legend-items').innerHTML = '';
+  document.getElementById('shipmentSummary').innerHTML = '<h2>Shipment updated</h2><p class="shipment-note">Calculate again to refresh container allocations and reports.</p>';
+  if (cargoGroup && appMode==='auto') renderCargo(null);
+}
+function exportShipmentCSV() {
+  if (!shipmentPlan) return;
+  const rows = [['Container','Equipment','SKU','Units','Gross weight kg']];
+  shipmentPlan.containers.forEach((c,i)=>c.skus.forEach(s=>{
+    const qty = s.qty-s.remaining;
+    if(qty) rows.push([i+1,shipmentPlan.spec.name,s.name,qty,+(qty*s.weight).toFixed(3)]);
+  }));
+  shipmentPlan.remaining.forEach(s=>rows.push(['UNALLOCATED',shipmentPlan.spec.name,s.name,s.qty,+(s.qty*s.weight).toFixed(3)]));
+  downloadFile('shipment-plan.csv','\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n'),'text/csv');
 }
 
 /* ============================================================
@@ -1676,13 +1642,13 @@ function buildReportHTML(packing, spec, opts, snaps, orient) {
 
     html += `<div class="slice-desc">
       <span style="display:inline-block;width:10px;height:10px;background:${colorHex};border-radius:2px;margin-right:6px;vertical-align:middle;"></span>
-      <strong>${escapeHTML(it.name)}</strong> — <span class="num">${colsUsed}</span> across × <span class="num">${rowsUsed}</span> high = <strong>${perSliceTotal} cartons</strong> per slice
+      <strong>${escapeHTML(it.name)}</strong> — <span class="num">${colsUsed}</span> across · up to <span class="num">${rowsUsed}</span> high · <strong>${perSliceTotal} cartons</strong> per slice
     </div>`;
     if (g.count > 1) {
       html += `<div class="slice-desc" style="color:var(--text-muted);">same pattern, repeated ${g.count} times</div>`;
     }
     html += `<div class="slice-detail">Slice depth: ${(sl.depth/10).toFixed(0)} cm. Original carton: ${sku.l/10} × ${sku.w/10} × ${sku.h/10} cm.</div>`;
-    html += `<div class="slice-orient">Loaded orientation: ${it.name} as ${(Number(it.orientation.split('x')[0])/10).toFixed(0)} × ${(Number(it.orientation.split('x')[1])/10).toFixed(0)} × ${(Number(it.orientation.split('x')[2])/10).toFixed(0)} cm</div>`;
+    html += `<div class="slice-orient">Loaded orientation: ${escapeHTML(it.name)} as ${(Number(it.orientation.split('x')[0])/10).toFixed(0)} × ${(Number(it.orientation.split('x')[1])/10).toFixed(0)} × ${(Number(it.orientation.split('x')[2])/10).toFixed(0)} cm</div>`;
 
     // Slice image
     if (imgSrc) {
@@ -1702,7 +1668,7 @@ function buildReportHTML(packing, spec, opts, snaps, orient) {
         html += `<div class="rpt-section-title" style="margin-top:14px;font-size:10px;">Orientation for this slice</div>`;
         html += `<div class="orient-cards">
           <div class="orient-card">
-            <div class="cube-wrap"><img src="${cubeImg}" alt="${it.name}"></div>
+            <div class="cube-wrap"><img src="${cubeImg}" alt="${escapeHTML(it.name)}"></div>
             <div class="orient-info">
               <div class="orient-name"><span class="dot" style="background:${colorHexP}"></span>
                 ${escapeHTML(it.name)} <span style="color:var(--text-dim);font-weight:400;">× ${it.qty}</span>
@@ -2038,7 +2004,7 @@ function exportSKUsCSV() {
 }
 function csvCell(v) {
   if (v === null || v === undefined) return '';
-  const s = String(v);
+  const s = typeof v === "string" && /^[=+@-]/.test(v) ? "'" + v : String(v);
   if (/[",\r\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
   return s;
 }
@@ -2117,6 +2083,9 @@ window.addEventListener('load', () => {
     document.body.classList.add('light');
     document.getElementById('themeBtn').textContent = '☀️';
   }
+  document.getElementById("sidebar").addEventListener("change", e => {
+    if (!["captureSnapshots","captureOrientation"].includes(e.target.id)) invalidateShipment();
+  });
   renderPresetButtons();
   loadSample();
   initThree();
