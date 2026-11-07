@@ -58,3 +58,17 @@ global optima. The underlying single-SKU-row packing assumptions still apply.
 If no complete plan is found, the best explored partial plan explicitly shows its
 unallocated cargo. All cargo is assumed stackable; operational verification remains
 necessary. The tests do not visually validate WebGL or external CDN availability.
+
+## Workspace presentation
+
+`css/workspace.css` contains the responsive visual layer. The workspace includes
+numbered setup sections, collapsible equipment/preset controls, live SKU/unit/CBM
+totals, container volume usage meters, comparison cards, and light/dark themes.
+View buttons support keyboard operation and expose pressed state; cargo fields
+have associated labels. Mobile calculation scrolls to the results, and a resize
+observer keeps the 3D canvas fitted as panels change size.
+
+The UI refresh was smoke-tested in headless Chromium at 1440×1050 and 390×844,
+covering calculation, view selection, light theme, report opening and horizontal
+overflow. Matching local copies of Three.js r128 and OrbitControls were substituted
+for the CDN URLs during that check because sandbox CDN access is restricted.

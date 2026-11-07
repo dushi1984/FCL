@@ -17,6 +17,11 @@ test('mixed fleet summary, selected report context and CSV use each container ty
  for(const id of ['20','40','40hc']){node('enable-'+id).checked=true;node('payload-'+id).value='27000';}
  await vm.runInContext('calculate()',context);
  assert.match(node('shipmentSummary').innerHTML,/1 × 20ft Standard/);
+ assert.match(node('shipmentSummary').innerHTML,/usage-meter/);
+ assert.match(node('shipmentSummary').innerHTML,/aria-pressed="true"/);
+ assert.match(node('shipmentSummary').innerHTML,/Loaded cargo volume/);
+ vm.runInContext('updateCargoTotals()',context);
+ assert.match(node('cargoTotals').innerHTML,/32/);
  assert.match(node('shipmentSummary').innerHTML,/1 × 40ft High Cube/);
  await vm.runInContext('selectShipmentContainer(1)',context);
  assert.equal(vm.runInContext('getReportContext().spec.name',context),'20ft Standard');
