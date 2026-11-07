@@ -1,6 +1,6 @@
 # FCL Container Loader
 
-The application lives in `index.html` and can be served as a static site without a build step. Three.js and OrbitControls use the existing CDN scripts.
+The static application starts at `index.html` and can be served as a static site without a build step. Three.js and OrbitControls use the existing CDN scripts.
 
 ## Full shipment planning
 
@@ -18,4 +18,43 @@ With Node.js installed:
 node --test tests/*.cjs
 ```
 
-Tests read the planner directly from `index.html`. They cover JavaScript syntax, capacity, multi-container overflow, payload, input validation, upright rotation, quantity conservation, placement bounds and overlap. GPU rendering and live CDN availability are not covered.
+Tests exercise the packing and fleet modules plus the inline UI integration (with rendering stubs). They cover JavaScript syntax, capacity, multi-container overflow, payload, input validation, upright rotation, quantity conservation, placement bounds and overlap. GPU rendering and live CDN availability are not covered.
+
+
+## Smart mixed-container planning
+
+**Smart mix** is the default. Enable the equipment types available for your shipment
+(20ft, 40ft standard, 40ft High Cube/HQ, optional 45ft High Cube), and enter the
+actual payload limits. Recommendations can combine types, e.g. one 40ft HQ and
+one 20ft. The fixed-type mode remains available.
+
+Priorities:
+- **Fewest containers:** container count first, then smallest total internal volume.
+- **Least space:** smallest combined internal volume first, then container count.
+- **Lowest cost:** lowest sum of your freight rates. Enter a positive rate for every
+  enabled type, all in the same currency. No market rates are assumed.
+
+Up to four distinct feasible fleet combinations are shown with total capacity,
+unused volume and freight totals when rates are complete. Selecting an alternative
+updates the container picker; selecting a container updates the 3D view and report.
+Shipment CSV includes the actual equipment type of each allocation.
+
+### Structure
+- `index.html`: interface, 3D visualization and reporting.
+- `js/packing.js`: upright row packing, input validation and fixed-type planning.
+- `js/fleet.js`: mixed-container search and recommendation ranking.
+- `tests/`: packing, fleet and UI integration regression checks.
+
+Serve the whole directory; no build step or npm installation is required.
+
+### Search limits
+
+The fleet engine packs actual geometry for each candidate rather than relying on
+CBM alone. It uses bounded beam search: at most 800 trials, eight retained states,
+100 container levels, and two extra levels beyond the first complete solution.
+These bounds keep planning practical but can exclude better combinations. Therefore
+cost/space recommendations are **best among explored candidates**, not guaranteed
+global optima. The underlying single-SKU-row packing assumptions still apply.
+If no complete plan is found, the best explored partial plan explicitly shows its
+unallocated cargo. All cargo is assumed stackable; operational verification remains
+necessary. The tests do not visually validate WebGL or external CDN availability.

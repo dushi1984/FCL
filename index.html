@@ -320,6 +320,8 @@
 @media(max-width:1000px) {#sidebar {width:320px;padding:16px}.shipment-stats {gap:8px}.shipment-stats b {font-size:20px}}
 @media(max-width:720px) {html,body {height:auto;overflow:auto}body {display:flex;flex-direction:column}#sidebar {width:100%;overflow:visible}#main {width:100%;min-height:800px}#shipmentSummary {max-height:none;margin:16px 12px;padding:16px}#viewer {height:540px;flex:none}#tabs {flex-wrap:wrap}#report {width:calc(100% - 24px);right:12px}.shipment-stats {grid-template-columns:1fr 1fr}#controls {flex-wrap:wrap;max-width:95%}}
 
+
+.equipment-row {padding:10px 0;border-bottom:1px solid var(--border-soft)}.equipment-row input[type=checkbox] {width:auto;margin-right:6px}.fleet-alternatives h3 {font-size:12px;color:var(--text-muted);margin:12px 0}.fleet-alternatives {display:grid;gap:6px;margin-bottom:16px}.fleet-alternatives button {margin:0;text-align:left;background:var(--bg-input);border:1px solid var(--border-strong);color:var(--text-body);padding:12px}.fleet-alternatives button.chosen {border-color:var(--accent);background:#24a99418}.fleet-alternatives span {display:block;color:var(--text-muted);font-size:11px;margin-top:6px}input:disabled,select:disabled {opacity:.5}
 </style>
 </head>
 <body>
@@ -335,6 +337,15 @@
 
   <div class="section">
     <h2>Container</h2>
+    <label for="planningMode">Fleet selection</label>
+    <select id="planningMode" onchange="updateFleetControls()"><option value="auto">Smart mix — compare container sizes</option><option value="fixed">Only the selected type</option></select>
+    <div id="fleetSettings">
+      <label for="fleetObjective">Planning priority</label>
+      <select id="fleetObjective"><option value="containers">Fewest containers, then least space</option><option value="space">Least total container space</option><option value="cost">Lowest entered freight cost</option></select>
+      <p class="shipment-note">Enable available equipment. Enter actual payloads and optional rates in one currency. High Cube is also called HQ.</p>
+      <div id="equipmentOptions"></div>
+    </div>
+    <label for="containerType">Fixed type / manual packing</label>
     <select id="containerType" onchange="onContainerChange()">
       <option value="20">20ft Standard — 5898×2352×2393 mm</option>
       <option value="40" selected>40ft Standard — 12032×2352×2393 mm</option>
@@ -458,6 +469,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
+<script src="js/packing.js"></script>
+<script src="js/fleet.js"></script>
 <script>
 /* ============================================================
    CONTAINER SPECS
@@ -1038,6 +1051,8 @@ function setMode(mode) {
   if (planBusy) return;
   document.getElementById("shipmentSummary").hidden = mode !== "auto";
   appMode = mode;
+  document.getElementById("containerType").disabled = mode === "auto" && document.getElementById("planningMode").value === "auto";
+  document.getElementById("maxWeight").disabled = document.getElementById("containerType").disabled;
   document.getElementById('modeAutoBtn').classList.toggle('active', mode === 'auto');
   document.getElementById('modeManualBtn').classList.toggle('active', mode === 'manual');
   document.getElementById('manualPanel').style.display = mode === 'manual' ? 'block' : 'none';
@@ -1052,7 +1067,7 @@ function setMode(mode) {
     btn.onclick = () => showToast('Click on the container floor', 'ok');
   }
   const spec = CONTAINERS[document.getElementById('containerType').value];
-  buildContainer(spec);
+  buildContainer(mode === "auto" && shipmentPlan?.containers[activeContainer] ? shipmentPlan.containers[activeContainer].spec : spec);
   if (mode === 'auto') {
     manualPlacements = []; selectedPlacementId = null; manualHistory = [];
     renderCargo(window.__lastPacking || null);
@@ -1196,56 +1211,7 @@ function renderLegend(packing) {
    ============================================================ */
 // Dimensions in millimeters; upright, supported single-SKU rows.
 // A feasible heuristic, not a guarantee of the minimum container count.
-function validateShipment(items, opts) {
-  if (!items.length) throw new Error('Add at least one cargo item.');
-  if (!Number.isFinite(opts.maxWeight) || opts.maxWeight <= 0) throw new Error('Enter a positive payload in kg.');
-  let total = 0;
-  for (const c of items) {
-    if (![c.l,c.w,c.h,c.weight].every(n => Number.isFinite(n) && n > 0)) throw new Error('Every SKU needs positive dimensions and weight.');
-    if (!Number.isSafeInteger(c.qty) || c.qty < 0) throw new Error('Quantities must be whole numbers, zero or greater.');
-    total += c.qty;
-  }
-  if (!total) throw new Error('Enter at least one unit to load.');
-  if (total > 50000) throw new Error('Plan up to 50,000 units at a time. Split larger shipments.');
-}
-function slicePacking(spec, items, opts) {
-  const skus = items.map((c,i)=>({...c,remaining:c.qty,colorIndex:i%SKU_PALETTE.length,eL:c.l,eW:c.w,eH:c.h}));
-  const slices = [];
-  let x = 0, totalWeight = 0, totalPacked = 0;
-  for (const sku of [...skus].sort((a,b)=>b.weight-a.weight || b.l*b.w*b.h-a.l*a.w*a.h)) {
-    while (sku.remaining > 0) {
-      const orientations = [[sku.l,sku.w,sku.h]];
-      if (opts.allowRotation) orientations.push([sku.w,sku.l,sku.h]);
-      let best = null;
-      for (const [l,w,h] of orientations) {
-        const cols = Math.floor(spec.w/w), rows = Math.floor(spec.h/h);
-        if (l > spec.l-x || !cols || !rows) continue;
-        const count = Math.min(cols*rows,sku.remaining,Math.floor((opts.maxWeight-totalWeight+1e-8)/sku.weight));
-        if (count > 0 && (!best || count/l > best.count/best.l)) best = {l,w,h,cols,count};
-      }
-      if (!best) break;
-      const {l,w,h,cols,count} = best;
-      const placementCells = Array.from({length:count},(_,i)=>({x,y:Math.floor(i/cols)*h,z:(i%cols)*w,l,w,h,skuId:sku.id,skuName:sku.name,colorIndex:sku.colorIndex,col:i%cols+1,row:Math.floor(i/cols)+1}));
-      slices.push({index:slices.length+1,depth:l,xStart:x,cols,rowsMax:Math.ceil(count/cols),rowsUsed:Math.ceil(count/cols),totalCartons:count,placementCells,
-        items:[{skuId:sku.id,name:sku.name,colorIndex:sku.colorIndex,qty:count,orientation:`${l}x${w}x${h}`}]});
-      Object.assign(sku,{eL:l,eW:w,eH:h});
-      sku.remaining -= count; totalWeight += count*sku.weight; totalPacked += count; x += l;
-    }
-  }
-  return {slices,skus,totalWeight,totalPacked};
-}
-function planShipment(spec, items, opts) {
-  validateShipment(items,opts);
-  const containers = [];
-  let remaining = items.map(c=>({...c}));
-  while (remaining.some(c=>c.qty>0) && containers.length < 100) {
-    const packing = slicePacking(spec,remaining,opts);
-    if (!packing.totalPacked) break;
-    containers.push(packing);
-    remaining = remaining.map(c=>({...c,qty:packing.skus.find(s=>s.id===c.id).remaining}));
-  }
-  return {spec,opts,containers,remaining:remaining.filter(c=>c.qty>0),requested:items.reduce((n,c)=>n+c.qty,0)};
-}
+const {validateShipment,slicePacking,planShipment} = Packing;
 
 /* Group slices — smarter: same SKU + same layout + same qty per slice */
 function groupSlices(slices) {
@@ -1522,6 +1488,30 @@ function groupKey(g) { return `${g.startIndex}-${g.endIndex}-${g.signature}`; }
 /* ============================================================
    CALCULATE
    ============================================================ */
+let fleetResults = null;
+let selectedFleet = 0;
+function updateFleetControls() {
+  const auto=document.getElementById('planningMode').value==='auto';
+  document.getElementById('fleetSettings').hidden=!auto;
+  document.getElementById('containerType').disabled=auto && appMode==='auto';
+  document.getElementById('maxWeight').disabled=auto && appMode==='auto';
+  invalidateShipment();
+}
+function renderEquipmentOptions() {
+  document.getElementById('equipmentOptions').innerHTML=Object.entries(CONTAINERS).map(([id,e])=>`<div class="equipment-row"><label><input type="checkbox" id="enable-${id}" ${id==='45hc'?'':'checked'}> ${escapeHTML(e.name)}</label><div class="row"><div><label for="payload-${id}">Payload kg</label><input id="payload-${id}" type="number" min="1" value="27000"></div><div><label for="rate-${id}">Freight rate</label><input id="rate-${id}" type="number" min="0" placeholder="Optional"></div></div></div>`).join('');
+  updateFleetControls();
+}
+function fleetLabel(p) {
+  const counts=new Map();
+  p.containers.forEach(c=>counts.set(c.spec.name,(counts.get(c.spec.name)||0)+1));
+  return [...counts].map(([name,n])=>`${n} × ${name}`).join(' + ') || 'No feasible load';
+}
+async function chooseFleet(index) {
+  if(planBusy || !fleetResults?.plans[index]) return;
+  selectedFleet=index;shipmentPlan=fleetResults.plans[index];activeContainer=0;
+  renderShipmentSummary();
+  if(shipmentPlan.containers.length) await selectShipmentContainer(0);
+}
 let shipmentPlan = null;
 let activeContainer = 0;
 let planBusy = false;
@@ -1534,15 +1524,21 @@ function renderShipmentSummary() {
     <div class="shipment-heading"><div><span class="eyebrow">FULL SHIPMENT PLAN</span><h2>${left ? 'Shipment needs attention' : `Fits in ${p.containers.length} container${p.containers.length===1?'':'s'}`}</h2></div><button onclick="exportShipmentCSV()">↓ Shipment CSV</button></div>
     <div class="shipment-stats"><div><b>${p.containers.length}</b><span>Containers planned</span></div><div><b>${(p.requested-left).toLocaleString()} <small>/ ${p.requested.toLocaleString()}</small></b><span>Units allocated</span></div><div><b>${weight.toLocaleString(undefined,{maximumFractionDigits:1})} <small>kg</small></b><span>Total loaded weight</span></div></div>
     ${left ? `<p class="shipment-warning">${left.toLocaleString()} units unallocated: ${p.remaining.map(c=>`${escapeHTML(c.name)} (${c.qty})`).join(', ')}. Check oversized/overweight cargo or the 100-container planning limit.</p>` : ''}
-    <div class="container-picker">${p.containers.map((c,i)=>`<button class="${i===activeContainer?'selected':''}" onclick="selectShipmentContainer(${i})" ${planBusy?'disabled':''}>Container ${i+1}<span>${c.totalPacked.toLocaleString()} units · ${(100*c.totalWeight/p.opts.maxWeight).toFixed(0)}% payload</span></button>`).join('')}</div>
-    <p class="shipment-note">${escapeHTML(p.spec.name)} · Conservative row-based estimate, not a guaranteed minimum. Verify door clearance, stackability and securing. Reports and 3D show the selected container.</p>`;
+    ${fleetResults ? `<div class="fleet-alternatives"><h3>Compare feasible plans</h3>${fleetResults.plans.map((f,i)=>`<button ${planBusy?'disabled':''} class="${i===selectedFleet?'chosen':''}" onclick="chooseFleet(${i})"><strong>${i===0?'Recommended: ':''}${escapeHTML(fleetLabel(f))}</strong><span>${f.remaining.length?'Incomplete · ':''}${f.totalCapacity.toFixed(1)} m³ capacity · ${(f.totalCapacity-f.loadedVolume).toFixed(1)} m³ unused${f.cost===null?'':` · Freight ${f.cost.toLocaleString()}`}</span></button>`).join('')}</div>` : ''}
+    <div class="container-picker">${p.containers.map((c,i)=>`<button class="${i===activeContainer?'selected':''}" onclick="selectShipmentContainer(${i})" ${planBusy?'disabled':''}>Container ${i+1} · ${escapeHTML(c.spec.name)}<span>${c.totalPacked.toLocaleString()} units · ${(100*c.totalWeight/c.opts.maxWeight).toFixed(0)}% payload</span></button>`).join('')}</div>
+    <p class="shipment-note">${escapeHTML(fleetLabel(p))} · Conservative row-based estimate, not a guaranteed minimum. Verify door clearance, stackability and securing. Reports and 3D show the selected container. ${fleetResults ? escapeHTML(fleetResults.searchNote) : ""}</p>`;
 }
 async function calculate() {
   if (appMode !== 'auto' || planBusy) return;
   try {
     const spec = CONTAINERS[document.getElementById('containerType').value];
     const opts = {maxWeight:+document.getElementById('maxWeight').value,allowRotation:document.getElementById('allowRotation').checked,sliceDepth:0};
-    const next = planShipment(spec,cargoItems,opts);
+    let next;
+    if(document.getElementById('planningMode').value==='auto') {
+      const equipment=Object.entries(CONTAINERS).filter(([id])=>document.getElementById('enable-'+id).checked).map(([id,e])=>({...e,id,maxWeight:+document.getElementById('payload-'+id).value,rate:document.getElementById('rate-'+id).value===''?null:+document.getElementById('rate-'+id).value}));
+      fleetResults=FleetPlanner.optimize(cargoItems,equipment,opts,document.getElementById('fleetObjective').value);
+      next=fleetResults.plans[0];selectedFleet=0;
+    } else { fleetResults=null; next=planShipment(spec,cargoItems,opts); }
     shipmentPlan = next; activeContainer = 0;
     renderShipmentSummary();
     if (next.containers.length) await selectShipmentContainer(0);
@@ -1552,7 +1548,7 @@ async function calculate() {
 async function selectShipmentContainer(index) {
   if (planBusy || !shipmentPlan?.containers[index]) return;
   const plan = shipmentPlan;
-  const {spec,opts} = plan, packing = plan.containers[index];
+  const packing = plan.containers[index], {spec,opts} = packing;
   planBusy = true; activeContainer = index;
   document.getElementById('mainActionBtn').disabled = true;
   renderShipmentSummary();
@@ -1572,7 +1568,7 @@ async function selectShipmentContainer(index) {
 }
 function invalidateShipment() {
   if (!shipmentPlan) return;
-  shipmentPlan = null; window.__lastPacking = null;
+  shipmentPlan = null; fleetResults=null; window.__lastPacking = null;
   sliceSnapshots = {}; orientationSnapshots = {};
   document.getElementById('report').innerHTML = '';
   document.getElementById('legend-items').innerHTML = '';
@@ -1584,9 +1580,9 @@ function exportShipmentCSV() {
   const rows = [['Container','Equipment','SKU','Units','Gross weight kg']];
   shipmentPlan.containers.forEach((c,i)=>c.skus.forEach(s=>{
     const qty = s.qty-s.remaining;
-    if(qty) rows.push([i+1,shipmentPlan.spec.name,s.name,qty,+(qty*s.weight).toFixed(3)]);
+    if(qty) rows.push([i+1,c.spec.name,s.name,qty,+(qty*s.weight).toFixed(3)]);
   }));
-  shipmentPlan.remaining.forEach(s=>rows.push(['UNALLOCATED',shipmentPlan.spec.name,s.name,s.qty,+(s.qty*s.weight).toFixed(3)]));
+  shipmentPlan.remaining.forEach(s=>rows.push(['UNALLOCATED','Not assigned',s.name,s.qty,+(s.qty*s.weight).toFixed(3)]));
   downloadFile('shipment-plan.csv','\ufeff'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n'),'text/csv');
 }
 
@@ -1747,6 +1743,10 @@ function escapeHTML(str) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function getReportContext() {
+  if (appMode === "auto" && shipmentPlan?.containers[activeContainer]) {
+    const packing=shipmentPlan.containers[activeContainer];
+    return {spec:packing.spec,opts:packing.opts,packing};
+  }
   const spec = CONTAINERS[document.getElementById('containerType').value];
   return {
     spec,
@@ -2086,6 +2086,7 @@ window.addEventListener('load', () => {
   document.getElementById("sidebar").addEventListener("change", e => {
     if (!["captureSnapshots","captureOrientation"].includes(e.target.id)) invalidateShipment();
   });
+  renderEquipmentOptions();
   renderPresetButtons();
   loadSample();
   initThree();
