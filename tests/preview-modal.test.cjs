@@ -1,0 +1,28 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const vm=require('node:vm');
+const fs=require('node:fs');
+test('preview moves the existing workspace into the dialog and restores it with focus',()=>{
+ const html=fs.readFileSync('index.html','utf8');
+ const source=html.slice(html.indexOf('let previewReturnFocus'),html.indexOf('function onResize'));
+ const nodes=new Map();let focus=null,resizes=0;
+ const node=id=>{if(!nodes.has(id))nodes.set(id,{id,open:false,hidden:false,isConnected:true,focus(){focus=this;},appendChild(c){c.parentElement=this;},prepend(c){c.parentElement=this;},showModal(){this.open=true;},close(){this.open=false;}});return nodes.get(id);};
+ const trigger=node('expand'),slot=node('previewSlot'),workspace=node('previewWorkspace');workspace.parentElement=slot;
+ const classes=new Set();
+ const context=vm.createContext({document:{getElementById:node,activeElement:trigger,body:{classList:{add:c=>classes.add(c),remove:c=>classes.delete(c)}}},appMode:'auto',shipmentPlan:{containers:[{spec:{name:'40ft High Cube'},totalPacked:24},{spec:{name:'20ft Standard'},totalPacked:8}]},activeContainer:1,planBusy:false,escapeHTML:s=>s,onResize:()=>resizes++});
+ vm.runInContext(source,context);
+ vm.runInContext('openPreviewModal()',context);
+ assert.equal(node('previewDialog').open,true);
+ assert.equal(workspace.parentElement,node('previewModalBody'));
+ assert.equal(focus,node('closePreviewBtn'));
+ assert.match(node('previewTitle').textContent,/Container 2 of 2 — 20ft Standard/);
+ vm.runInContext('closePreviewModal(); restorePreview()',context);
+ assert.equal(workspace.parentElement,slot);
+ assert.equal(node('previewPlaceholder').hidden,true);
+ assert.equal(node('previewDialog').open,false);
+ assert.equal(focus,trigger);
+ assert.equal(classes.size,0);
+ assert.equal(resizes,2);
+ vm.runInContext('openPreviewModal(); closePreviewModal()',context);
+ assert.equal(workspace.parentElement,slot);
+});

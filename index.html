@@ -393,6 +393,7 @@
 
 <main id="main"><header class="workspace-header"><div><span class="eyebrow">LOGISTICS / SHIPMENT PLANNING</span><h2>Your loading workspace</h2></div><a class="edit-shipment" href="#sidebar">Edit shipment <span aria-hidden="true">↗</span></a></header>
   <section id="shipmentSummary" aria-live="polite"><span class="eyebrow">SHIPMENT WORKSPACE</span><div class="empty-illustration" aria-hidden="true"><span></span><span></span><span></span></div><h2>A smarter plan for every carton.</h2><p class="shipment-note">Enter dimensions, gross unit weight and the full quantity. Calculate to compare container combinations and see exactly where your cargo goes.</p><div class="empty-steps"><span><b>01</b> Set equipment</span><span><b>02</b> Add your cargo</span><span><b>03</b> Compare plans</span></div></section>
+  <div id="previewSlot"><div id="previewWorkspace">
   <div id="tabs">
     <button type="button" class="tab active" data-view="3d" aria-pressed="true">3D perspective</button>
     <button type="button" class="tab" data-view="top" aria-pressed="false">Top</button>
@@ -401,6 +402,7 @@
     <div class="tab-spacer"></div>
 
     <div class="top-actions">
+      <button class="tab-btn expand-preview" onclick="openPreviewModal()" aria-haspopup="dialog">⛶ Expand preview</button>
       <div class="dropdown" id="exportDropdown">
         <button class="dropdown-toggle" aria-label="Export selected container report" onclick="toggleExportMenu(event)">
           ↓ <span class="lbl">Export</span> <span class="arrow">▾</span>
@@ -461,7 +463,13 @@
     </div>
     <div id="report"></div>
   </div>
+  </div><div id="previewPlaceholder" hidden><p>Loading preview is open in a larger window.</p><button class="btn-secondary" onclick="closePreviewModal()">Return preview here</button></div></div>
 </main>
+<dialog id="previewDialog" aria-labelledby="previewTitle" onclose="restorePreview()" oncancel="event.preventDefault(); closePreviewModal()">
+  <header class="preview-modal-header"><div><span class="eyebrow">LOADING PLAN / 3D INSPECTION</span><h2 id="previewTitle">Container preview</h2></div><button id="closePreviewBtn" onclick="closePreviewModal()" aria-label="Close preview">✕ Close</button></header>
+  <div class="preview-modal-tools"><label for="previewContainer">Inspect container</label><select id="previewContainer" onchange="selectShipmentContainer(Number(this.value))"></select><p>Drag to orbit · Scroll to zoom · Escape to close</p></div>
+  <div id="previewModalBody"></div>
+</dialog>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -604,11 +612,48 @@ function initThree() {
   window.addEventListener('keydown', onManualKeyDown);
   animate();
 }
+let previewReturnFocus = null;
+function updatePreviewHeader() {
+  const select = document.getElementById('previewContainer');
+  const containers = appMode === 'auto' ? shipmentPlan?.containers || [] : [];
+  select.innerHTML = containers.map((c,i)=>`<option value="${i}">Container ${i+1} · ${escapeHTML(c.spec.name)} · ${c.totalPacked.toLocaleString()} units</option>`).join('');
+  select.value = String(activeContainer);
+  select.disabled = planBusy || !containers.length;
+  const selected = containers[activeContainer];
+  document.getElementById('previewTitle').textContent = selected ? `Container ${activeContainer+1} of ${containers.length} — ${selected.spec.name}` : 'Container preview';
+}
+function openPreviewModal() {
+  const dialog = document.getElementById('previewDialog');
+  if (dialog.open || typeof dialog.showModal !== 'function') return;
+  previewReturnFocus = document.activeElement;
+  updatePreviewHeader();
+  dialog.showModal();
+  document.getElementById('previewModalBody').appendChild(document.getElementById('previewWorkspace'));
+  document.getElementById('previewPlaceholder').hidden = false;
+  document.body.classList.add('preview-modal-open');
+  document.getElementById('closePreviewBtn').focus();
+  onResize();
+}
+function closePreviewModal() {
+  document.getElementById('previewDialog').close();
+  restorePreview();
+}
+function restorePreview() {
+  if (document.getElementById('previewWorkspace').parentElement === document.getElementById('previewSlot')) return;
+  document.getElementById('previewSlot').prepend(document.getElementById('previewWorkspace'));
+  document.getElementById('previewPlaceholder').hidden = true;
+  document.body.classList.remove('preview-modal-open');
+  onResize();
+  if (previewReturnFocus?.isConnected) previewReturnFocus.focus({preventScroll:true});
+  previewReturnFocus = null;
+}
 function onResize() {
   const c = document.getElementById('canvas-container');
+  if (!camera || !renderer || !c.clientWidth || !c.clientHeight) return;
   camera.aspect = c.clientWidth / c.clientHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(c.clientWidth, c.clientHeight);
+  if (controls && currentContainerSpec) applyView(currentView);
 }
 function animate() {
   requestAnimationFrame(animate);
@@ -618,7 +663,7 @@ function animate() {
 function resetView() {
   const c = currentContainerSpec || CONTAINERS[document.getElementById('containerType').value];
   const cx = c.l / 2, cy = c.h / 2, cz = c.w / 2;
-  const d = Math.max(c.l, c.w, c.h);
+  const d = Math.max(c.l, c.w, c.h) * Math.max(1, 1 / camera.aspect);
   camera.position.set(cx + d * 0.55, cy + d * 0.55, cz + d * 0.95);
   controls.target.set(cx, cy * 0.6, cz);
   controls.update();
@@ -756,6 +801,7 @@ function onPointerUp(e) {
   placeNewBox(fp.x, fp.z);
 }
 function onManualKeyDown(e) {
+  if (e.target.closest?.('input,select,textarea,button')) return;
   if (appMode !== 'manual') return;
   if (selectedPlacementId === null) return;
   if (document.activeElement && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
@@ -1560,7 +1606,8 @@ async function calculate() {
     renderShipmentSummary();
     if (next.containers.length) await selectShipmentContainer(0);
     else { renderCargo(null); document.getElementById('report').innerHTML=''; }
-    if (window.matchMedia?.('(max-width: 720px)').matches) document.getElementById('main').scrollIntoView({behavior:'auto',block:'start'});
+    if (next.containers.length) openPreviewModal();
+    if (!document.getElementById('previewDialog').open && window.matchMedia?.('(max-width: 720px)').matches) document.getElementById('main').scrollIntoView({behavior:'auto',block:'start'});
   } catch(e) { showToast(e.message,'warn'); }
 }
 async function selectShipmentContainer(index) {
@@ -1570,6 +1617,7 @@ async function selectShipmentContainer(index) {
   planBusy = true; activeContainer = index;
   document.getElementById('mainActionBtn').disabled = true;
   renderShipmentSummary();
+  updatePreviewHeader();
   try {
     buildContainer(spec); resetView(); sliceHighlightIndex = -1;
     renderCargo(packing); renderLegend(packing);
@@ -1582,7 +1630,7 @@ async function selectShipmentContainer(index) {
     document.getElementById('report').style.display = 'none';
     applyView(currentView);
   } catch(e) { showToast('Could not render preview: '+e.message,'warn'); }
-  finally { planBusy=false; document.getElementById('mainActionBtn').disabled=false; renderShipmentSummary(); }
+  finally { planBusy=false; document.getElementById('mainActionBtn').disabled=false; renderShipmentSummary(); updatePreviewHeader(); }
 }
 function invalidateShipment() {
   if (!shipmentPlan) return;
@@ -1820,7 +1868,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 function applyView(view) {
   const spec = currentContainerSpec || CONTAINERS[document.getElementById('containerType').value];
   const cx = spec.l/2, cy = spec.h/2, cz = spec.w/2;
-  const d = Math.max(spec.l, spec.w, spec.h);
+  const d = Math.max(spec.l, spec.w, spec.h) * Math.max(1, 1 / camera.aspect);
   if (view === '3d') resetView();
   else if (view === 'top') { camera.position.set(cx, cy + d*1.4, cz); controls.target.set(cx, 0, cz); controls.update(); }
   else if (view === 'side') { camera.position.set(cx, cy, cz + d*1.4); controls.target.set(cx, cy, cz); controls.update(); }
