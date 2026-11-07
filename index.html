@@ -323,27 +323,27 @@
 
 .equipment-row {padding:10px 0;border-bottom:1px solid var(--border-soft)}.equipment-row input[type=checkbox] {width:auto;margin-right:6px}.fleet-alternatives h3 {font-size:12px;color:var(--text-muted);margin:12px 0}.fleet-alternatives {display:grid;gap:6px;margin-bottom:16px}.fleet-alternatives button {margin:0;text-align:left;background:var(--bg-input);border:1px solid var(--border-strong);color:var(--text-body);padding:12px}.fleet-alternatives button.chosen {border-color:var(--accent);background:#24a99418}.fleet-alternatives span {display:block;color:var(--text-muted);font-size:11px;margin-top:6px}input:disabled,select:disabled {opacity:.5}
 </style>
+<link rel="stylesheet" href="css/workspace.css">
 </head>
 <body>
 
 <div id="sidebar">
-  <h1>FCL Container Loader</h1>
-  <p class="subtitle">Full quantities · multiple containers · clear loading plans</p>
+  <a class="brand" href="#main"><span class="brand-icon" aria-hidden="true">▥</span><span>FCL<span class="brand-light"> / Planner</span><small>SMART FREIGHT WORKSPACE</small></span></a><h1>Build your shipment.</h1><p class="subtitle">From carton quantities to a confident loading plan.</p>
 
   <div class="mode-switch">
-    <button class="mode-btn active" id="modeAutoBtn" onclick="setMode('auto')">🔄 Auto Plan</button>
-    <button class="mode-btn" id="modeManualBtn" onclick="setMode('manual')">✋ Manual Pack</button>
+    <button class="mode-btn active" id="modeAutoBtn" onclick="setMode('auto')">Auto planner</button>
+    <button class="mode-btn" id="modeManualBtn" onclick="setMode('manual')">Manual workspace</button>
   </div>
 
   <div class="section">
-    <h2>Container</h2>
+    <h2><span class="step-number">01</span> Equipment & strategy</h2>
     <label for="planningMode">Fleet selection</label>
     <select id="planningMode" onchange="updateFleetControls()"><option value="auto">Smart mix — compare container sizes</option><option value="fixed">Only the selected type</option></select>
     <div id="fleetSettings">
       <label for="fleetObjective">Planning priority</label>
       <select id="fleetObjective"><option value="containers">Fewest containers, then least space</option><option value="space">Least total container space</option><option value="cost">Lowest entered freight cost</option></select>
       <p class="shipment-note">Enable available equipment. Enter actual payloads and optional rates in one currency. High Cube is also called HQ.</p>
-      <div id="equipmentOptions"></div>
+      <details class="equipment-details"><summary>Available equipment & freight rates<span>Configure</span></summary><div id="equipmentOptions"></div></details>
     </div>
     <label for="containerType">Fixed type / manual packing</label>
     <select id="containerType" onchange="onContainerChange()">
@@ -359,23 +359,22 @@
   </div>
 
   <div class="section">
-    <h2>Cargo Items (SKUs)</h2>
-    <label>Quick presets:</label>
-    <div id="presetButtons"></div>
+    <h2><span class="step-number">02</span> Shipment cargo</h2><div id="cargoTotals" class="cargo-totals" aria-live="polite"></div>
+    <details class="preset-details"><summary>Add from carton & pallet presets</summary><div id="presetButtons"></div></details>
     <div id="cargoList" style="margin-top:10px;"></div>
     <button class="btn-secondary" onclick="addCargo()">+ Add Custom Item</button>
   </div>
 
   <div class="section" id="autoRulesSection">
-    <h2>Auto Loading Rules</h2>
+    <h2><span class="step-number">03</span> Loading preferences</h2>
     <input type="hidden" id="sliceDepth" value="60"><p class="shipment-note">Enter your entire shipment quantity. Row depth adapts to the cargo; remaining units continue into the next container.</p>
     <label><input type="checkbox" id="allowRotation" checked style="width:auto; margin-right:8px;"> Allow floor rotation (keep upright)</label>
     <label><input type="checkbox" id="captureSnapshots" style="width:auto; margin-right:8px;"> Include slice images in report</label>
     <label><input type="checkbox" id="captureOrientation" style="width:auto; margin-right:8px;"> Include orientation cubes</label>
   </div>
 
-  <button class="btn-primary" id="mainActionBtn" onclick="calculate()">Calculate full shipment</button>
-  <button class="btn-secondary" onclick="loadSample()">Load example shipment</button>
+  <div class="planning-actions"><button class="btn-primary" id="mainActionBtn" onclick="calculate()">Calculate full shipment</button>
+  <button class="btn-secondary" onclick="loadSample()">Load example shipment</button></div>
 
   <div class="section" id="manualHelpSection" style="display:none;">
     <h2>Manual Mode Guide</h2>
@@ -392,19 +391,19 @@
   </div>
 </div>
 
-<div id="main">
-  <section id="shipmentSummary" aria-live="polite"><span class="eyebrow">SHIPMENT WORKSPACE</span><h2>Will all your cartons fit?</h2><p class="shipment-note">Enter dimensions, gross unit weight and the full quantity. Calculate to see how many containers you need.</p></section>
+<main id="main"><header class="workspace-header"><div><span class="eyebrow">LOGISTICS / SHIPMENT PLANNING</span><h2>Your loading workspace</h2></div><a class="edit-shipment" href="#sidebar">Edit shipment <span aria-hidden="true">↗</span></a></header>
+  <section id="shipmentSummary" aria-live="polite"><span class="eyebrow">SHIPMENT WORKSPACE</span><div class="empty-illustration" aria-hidden="true"><span></span><span></span><span></span></div><h2>A smarter plan for every carton.</h2><p class="shipment-note">Enter dimensions, gross unit weight and the full quantity. Calculate to compare container combinations and see exactly where your cargo goes.</p><div class="empty-steps"><span><b>01</b> Set equipment</span><span><b>02</b> Add your cargo</span><span><b>03</b> Compare plans</span></div></section>
   <div id="tabs">
-    <div class="tab active" data-view="3d">3D</div>
-    <div class="tab" data-view="top">Top</div>
-    <div class="tab" data-view="side">Side</div>
-    <div class="tab" data-view="front">Front</div>
+    <button type="button" class="tab active" data-view="3d" aria-pressed="true">3D perspective</button>
+    <button type="button" class="tab" data-view="top" aria-pressed="false">Top</button>
+    <button type="button" class="tab" data-view="side" aria-pressed="false">Side</button>
+    <button type="button" class="tab" data-view="front" aria-pressed="false">Front</button>
     <div class="tab-spacer"></div>
 
     <div class="top-actions">
       <div class="dropdown" id="exportDropdown">
-        <button class="dropdown-toggle" onclick="toggleExportMenu(event)">
-          📤 <span class="lbl">Export</span> <span class="arrow">▾</span>
+        <button class="dropdown-toggle" aria-label="Export selected container report" onclick="toggleExportMenu(event)">
+          ↓ <span class="lbl">Export</span> <span class="arrow">▾</span>
         </button>
         <div class="dropdown-menu" onclick="event.stopPropagation()">
           <div class="menu-label">Print</div>
@@ -422,15 +421,15 @@
           <button onclick="exportSnapshotsZIP()"><span class="icon">🖼️</span><span>Download Slice Snapshots</span><span class="hint">.html</span></button>
         </div>
       </div>
-      <button class="tab-btn" onclick="toggleReport()">📄 <span class="lbl">Report</span></button>
-      <button class="tab-btn theme-btn" id="themeBtn" onclick="toggleTheme()">🌙</button>
+      <button class="tab-btn" aria-label="Toggle selected container report" onclick="toggleReport()"><span class="lbl">Report</span></button>
+      <button class="tab-btn theme-btn" id="themeBtn" aria-label="Toggle light or dark theme" title="Toggle theme" onclick="toggleTheme()">☾</button>
     </div>
   </div>
   <div id="viewer">
     <div id="canvas-container"></div>
 
     <div id="manualPanel">
-      <h3>✋ Manual Packing <span class="badge" id="mpModeBadge">PLACING</span></h3>
+      <h3>Manual workspaceing <span class="badge" id="mpModeBadge">PLACING</span></h3>
       <div class="mp-group">
         <div class="mp-group-title">Place Next As</div>
         <select id="mpSkuSelect" onchange="updateManualSelection()"></select>
@@ -462,9 +461,9 @@
     </div>
     <div id="report"></div>
   </div>
-</div>
+</main>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -1112,7 +1111,18 @@ function renderPresetButtons() {
     wrap.appendChild(b);
   });
 }
+function updateCargoTotals() {
+  const valid = cargoItems.every(c=>[c.l,c.w,c.h,c.weight,c.qty].every(n=>Number.isFinite(n)&&n>=0));
+  const qty=cargoItems.reduce((n,c)=>n+c.qty,0);
+  const volume=cargoItems.reduce((n,c)=>n+c.l*c.w*c.h*c.qty/1e9,0);
+  document.getElementById('cargoTotals').innerHTML=valid ? `<span><strong>${cargoItems.length}</strong> SKUs</span><span><strong>${qty.toLocaleString()}</strong> units</span><span><strong>${volume.toFixed(2)}</strong> m³</span>` : '<span>Check cargo values below</span>';
+}
+function containerUsage(c) {
+  const volume=c.slices.reduce((n,s)=>n+s.placementCells.reduce((v,b)=>v+b.l*b.w*b.h/1e9,0),0);
+  return {volume,percent:100*volume/(c.spec.l*c.spec.w*c.spec.h/1e9)};
+}
 function renderCargoList() {
+  updateCargoTotals();
   invalidateShipment();
   const list = document.getElementById('cargoList');
   list.innerHTML = '';
@@ -1122,7 +1132,7 @@ function renderCargoList() {
     const colorHex = '#' + SKU_PALETTE[idx % SKU_PALETTE.length].toString(16).padStart(6, '0');
     div.innerHTML = `
       <div class="sku-tag" style="color:${colorHex}">SKU ${idx + 1}</div>
-      <button class="remove" onclick="removeCargo(${c.id})">×</button>
+      <button class="remove" aria-label="Remove ${escapeHTML(c.name)}" title="Remove cargo item" onclick="removeCargo(${c.id})">×</button>
       <label>Name</label>
       <input type="text" value="${escapeHTML(c.name)}" onchange="updateCargo(${c.id},'name',this.value)">
       <div class="row">
@@ -1134,6 +1144,11 @@ function renderCargoList() {
         <div><label>Weight (kg)</label><input type="number" value="${c.weight}" step="0.1" onchange="updateCargo(${c.id},'weight',+this.value)"></div>
         <div><label>Quantity</label><input type="number" value="${c.qty}" onchange="updateCargo(${c.id},'qty',+this.value)"></div>
       </div>`;
+    div.querySelectorAll('input').forEach((input,i)=>{
+      input.id=`cargo-${c.id}-${i}`;
+      const label=input.previousElementSibling;
+      if(label?.tagName==='LABEL') label.htmlFor=input.id;
+    });
     list.appendChild(div);
   });
   const sel = document.getElementById('mpSkuSelect');
@@ -1165,6 +1180,7 @@ function removeCargo(id) {
 function updateCargo(id, field, value) {
   const c = cargoItems.find(x => x.id === id);
   if (c) c[field] = value;
+  updateCargoTotals();
   invalidateShipment();
 }
 function loadSample() {
@@ -1520,13 +1536,14 @@ function renderShipmentSummary() {
   if (!p) return;
   const left = p.remaining.reduce((n,c)=>n+c.qty,0);
   const weight = p.containers.reduce((n,c)=>n+c.totalWeight,0);
+  const volume = p.containers.reduce((n,c)=>n+containerUsage(c).volume,0);
   document.getElementById('shipmentSummary').innerHTML = `
-    <div class="shipment-heading"><div><span class="eyebrow">FULL SHIPMENT PLAN</span><h2>${left ? 'Shipment needs attention' : `Fits in ${p.containers.length} container${p.containers.length===1?'':'s'}`}</h2></div><button onclick="exportShipmentCSV()">↓ Shipment CSV</button></div>
-    <div class="shipment-stats"><div><b>${p.containers.length}</b><span>Containers planned</span></div><div><b>${(p.requested-left).toLocaleString()} <small>/ ${p.requested.toLocaleString()}</small></b><span>Units allocated</span></div><div><b>${weight.toLocaleString(undefined,{maximumFractionDigits:1})} <small>kg</small></b><span>Total loaded weight</span></div></div>
+    <div class="shipment-heading"><div><span class="plan-status ${left?'attention':'complete'}">${left?'Review required':'All cargo allocated'}</span><h2>${left ? 'Shipment needs attention' : `Fits in ${p.containers.length} container${p.containers.length===1?'':'s'}`}</h2></div><button onclick="exportShipmentCSV()">↓ Shipment CSV</button></div>
+    <div class="shipment-stats"><div><b>${p.containers.length}</b><span>Containers planned</span></div><div><b>${(p.requested-left).toLocaleString()} <small>/ ${p.requested.toLocaleString()}</small></b><span>Units allocated</span></div><div><b>${weight.toLocaleString(undefined,{maximumFractionDigits:1})} <small>kg</small></b><span>Total loaded weight</span></div><div><b>${volume.toFixed(2)} <small>m³</small></b><span>Loaded cargo volume</span></div></div>
     ${left ? `<p class="shipment-warning">${left.toLocaleString()} units unallocated: ${p.remaining.map(c=>`${escapeHTML(c.name)} (${c.qty})`).join(', ')}. Check oversized/overweight cargo or the 100-container planning limit.</p>` : ''}
-    ${fleetResults ? `<div class="fleet-alternatives"><h3>Compare feasible plans</h3>${fleetResults.plans.map((f,i)=>`<button ${planBusy?'disabled':''} class="${i===selectedFleet?'chosen':''}" onclick="chooseFleet(${i})"><strong>${i===0?'Recommended: ':''}${escapeHTML(fleetLabel(f))}</strong><span>${f.remaining.length?'Incomplete · ':''}${f.totalCapacity.toFixed(1)} m³ capacity · ${(f.totalCapacity-f.loadedVolume).toFixed(1)} m³ unused${f.cost===null?'':` · Freight ${f.cost.toLocaleString()}`}</span></button>`).join('')}</div>` : ''}
-    <div class="container-picker">${p.containers.map((c,i)=>`<button class="${i===activeContainer?'selected':''}" onclick="selectShipmentContainer(${i})" ${planBusy?'disabled':''}>Container ${i+1} · ${escapeHTML(c.spec.name)}<span>${c.totalPacked.toLocaleString()} units · ${(100*c.totalWeight/c.opts.maxWeight).toFixed(0)}% payload</span></button>`).join('')}</div>
-    <p class="shipment-note">${escapeHTML(fleetLabel(p))} · Conservative row-based estimate, not a guaranteed minimum. Verify door clearance, stackability and securing. Reports and 3D show the selected container. ${fleetResults ? escapeHTML(fleetResults.searchNote) : ""}</p>`;
+    <div class="container-section-heading"><h3>Container breakdown</h3><span>Select to inspect in 3D</span></div><div class="container-picker">${p.containers.map((c,i)=>`<button class="${i===activeContainer?'selected':''}" aria-pressed="${i===activeContainer}" onclick="selectShipmentContainer(${i})" ${planBusy?'disabled':''}><span class="container-number">CONTAINER ${String(i+1).padStart(2,'0')}</span><strong>${escapeHTML(c.spec.name)}</strong><span>${c.totalPacked.toLocaleString()} units · ${(100*c.totalWeight/c.opts.maxWeight).toFixed(0)}% payload</span><span class="usage-meter" aria-hidden="true"><i style="width:${Math.min(100,containerUsage(c).percent).toFixed(1)}%"></i></span><span>${containerUsage(c).percent.toFixed(0)}% volume used</span></button>`).join('')}</div>
+    ${fleetResults ? `<div class="fleet-alternatives"><h3>Compare your options <small>Select a plan to explore its loading layout</small></h3>${fleetResults.plans.map((f,i)=>`<button ${planBusy?'disabled':''} class="${i===selectedFleet?'chosen':''}" aria-pressed="${i===selectedFleet}" onclick="chooseFleet(${i})"><span class="option-badge">${i===0?'Recommended':`Alternative ${i}`}<em>${i===selectedFleet?'Selected':'View plan →'}</em></span><strong>${escapeHTML(fleetLabel(f))}</strong><span>${f.remaining.length?'Incomplete · ':''}${f.totalCapacity.toFixed(1)} m³ capacity · ${(f.totalCapacity-f.loadedVolume).toFixed(1)} m³ unused${f.cost===null?'':` · Freight ${f.cost.toLocaleString()}`}</span></button>`).join('')}</div>` : ''}
+    <details class="plan-assumptions"><summary>Planning assumptions & limits</summary><p class="shipment-note">${escapeHTML(fleetLabel(p))} · Conservative row-based estimate, not a guaranteed minimum. Verify door clearance, stackability and securing. Reports and 3D show the selected container. ${fleetResults ? escapeHTML(fleetResults.searchNote) : ""}</p></details>`;
 }
 async function calculate() {
   if (appMode !== 'auto' || planBusy) return;
@@ -1543,6 +1560,7 @@ async function calculate() {
     renderShipmentSummary();
     if (next.containers.length) await selectShipmentContainer(0);
     else { renderCargo(null); document.getElementById('report').innerHTML=''; }
+    if (window.matchMedia?.('(max-width: 720px)').matches) document.getElementById('main').scrollIntoView({behavior:'auto',block:'start'});
   } catch(e) { showToast(e.message,'warn'); }
 }
 async function selectShipmentContainer(index) {
@@ -1792,8 +1810,9 @@ function updateSliceButtons() {
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     if (tab.classList.contains('tab-btn')) return;
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-pressed','false'); });
     tab.classList.add('active');
+    tab.setAttribute('aria-pressed','true');
     currentView = tab.dataset.view;
     applyView(currentView);
   });
@@ -1809,7 +1828,7 @@ function applyView(view) {
 }
 function toggleTheme() {
   const isLight = document.body.classList.toggle('light');
-  document.getElementById('themeBtn').textContent = isLight ? '☀️' : '🌙';
+  document.getElementById('themeBtn').textContent = isLight ? '☀' : '☾';
   try { localStorage.setItem('fcl-theme', isLight ? 'light' : 'dark'); } catch(e) {}
   applyThreeTheme();
 }
@@ -1904,7 +1923,8 @@ function printReport() {
     .step { background: #f8fafc; padding: 7px 10px; border-radius: 5px; margin: 4px 0; border-left: 3px solid #2563eb; font-size: 10.5px; page-break-inside: avoid; }
     .print-footer { margin-top: 16px; padding-top: 8px; border-top: 1px solid #cbd5e1; font-size: 9.5px; color: #64748b; display: flex; justify-content: space-between; }
     @media print { body { -webkit-print-color-adjust: exact; } }`;
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Loading Plan</title><style>${css}</style></head><body>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Loading Plan</title><style>${css}</style><link rel="stylesheet" href="css/workspace.css">
+</head><body>
     <div class="print-header"><div class="brand">Container Loading Plan<small>FCL Container Loader${r.mode === 'manual' ? ' · Manual Layout' : ''}</small></div><div class="ts"><strong>Generated</strong>${escapeHTML(ts)}</div></div>
     ${r.html}
     <div class="print-footer"><span>Client: ${escapeHTML(client)} · ${escapeHTML(r.ctx.spec.name)}</span><span>FCL Container Loader</span></div>
@@ -1951,7 +1971,8 @@ function exportHTML() {
     .item-chip .dot{width:9px;height:9px;border-radius:2px}.item-chip .qty{font-weight:700}
     .step{background:#f8fafc;padding:10px 12px;border-radius:6px;margin:6px 0;border-left:3px solid #2563eb;font-size:12px}
     .doc-footer{margin-top:24px;padding-top:12px;border-top:1px solid #cbd5e1;font-size:11px;color:#64748b;text-align:center}`;
-  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Loading Plan — ${escapeHTML(client)}</title><style>${css}</style></head><body>
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Loading Plan — ${escapeHTML(client)}</title><style>${css}</style><link rel="stylesheet" href="css/workspace.css">
+</head><body>
     <div class="container"><div class="doc-head"><div class="brand">Container Loading Plan<small>FCL Container Loader${r.mode === 'manual' ? ' · Manual Layout' : ''}</small></div><div class="ts"><strong>Generated</strong>${escapeHTML(ts)}</div></div>
     ${r.html}<div class="doc-footer">Client: ${escapeHTML(client)} · ${escapeHTML(r.ctx.spec.name)}</div></div></body></html>`;
   downloadFile(`loading-plan-${sanitize(client)}-${dateStamp()}.html`, html, 'text/html');
@@ -2040,7 +2061,8 @@ function exportSnapshotsZIP() {
   const ctx = getReportContext();
   const client = document.getElementById('clientName').value || 'Client';
   const groups = groupSlices(ctx.packing.slices);
-  let gHTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Snapshots — ${escapeHTML(client)}</title></head><body style="font-family:sans-serif;padding:24px;background:#eef2f7"><h1>Slice Snapshots</h1>`;
+  let gHTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Snapshots — ${escapeHTML(client)}</title><link rel="stylesheet" href="css/workspace.css">
+</head><body style="font-family:sans-serif;padding:24px;background:#eef2f7"><h1>Slice Snapshots</h1>`;
   groups.forEach(g => {
     const sl = g.sample; const key = groupKey(g); const img = sliceSnapshots[key];
     const it = sl.items[0];
@@ -2081,7 +2103,7 @@ window.addEventListener('load', () => {
   try { saved = localStorage.getItem('fcl-theme') || 'dark'; } catch(e) {}
   if (saved === 'light') {
     document.body.classList.add('light');
-    document.getElementById('themeBtn').textContent = '☀️';
+    document.getElementById('themeBtn').textContent = '☀';
   }
   document.getElementById("sidebar").addEventListener("change", e => {
     if (!["captureSnapshots","captureOrientation"].includes(e.target.id)) invalidateShipment();
@@ -2093,6 +2115,7 @@ window.addEventListener('load', () => {
   const spec = CONTAINERS['40'];
   buildContainer(spec);
   resetView();
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(()=>onResize()).observe(document.getElementById('viewer'));
 });
 </script>
 </body></html>
