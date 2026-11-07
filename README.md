@@ -72,3 +72,19 @@ The UI refresh was smoke-tested in headless Chromium at 1440×1050 and 390×844,
 covering calculation, view selection, light theme, report opening and horizontal
 overflow. Matching local copies of Three.js r128 and OrbitControls were substituted
 for the CDN URLs during that check because sandbox CDN access is restricted.
+
+## Expanded loading preview
+
+The embedded preview now has a fixed workspace height (620px desktop / 560px
+mobile), independent of the shipment results. The main workspace scrolls rather
+than squeezing the canvas. A successful calculation opens a large native dialog;
+**Expand preview** opens it again at any time. The same WebGL canvas and controls
+are moved into the dialog, not recreated. Switch containers using the dialog's
+selector, use the view/report controls, and press Escape or Close to return.
+Focus returns to the opener, and native dialog behavior isolates background controls.
+Canvas dimensions and camera framing adapt on resize, including portrait screens.
+
+Browser checks verified stable embedded canvas height before/after calculation,
+larger modal dimensions, container switching, Escape/Close/reopen, focus return,
+mobile layout, view selection and reports without page errors. As with prior UI
+checks, matching local copies replaced CDN scripts in the test browser only.
